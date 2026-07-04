@@ -27,7 +27,7 @@ A `?` after a field's type (below) marks it **optional**: the collector omits it
 | `turns` | int | `23` |
 | `tokens_in` / `tokens_out` | int | `184000` / `52000` |
 | `language` | enum? | `"typescript"` (from a fixed list of 30) — optional |
-| `framework` | enum? | `"nextjs"` (from a fixed list of 80) — optional |
+| `framework` | enum? | `"nextjs"` (from a fixed list of 82) — optional |
 | `ended_by` | enum | `"user"` \| `"agent"` \| `"error"` |
 
 ## Event: `dependency_added`

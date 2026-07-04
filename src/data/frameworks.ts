@@ -84,12 +84,14 @@ export const FRAMEWORKS = [
   'rocket',
   'tokio',
   'tauri',
-  // Mobile / cross-platform
+  // Mobile / cross-platform / desktop / build
   'flutter',
   'reactnative',
   'expo',
   'ionic',
   'capacitor',
+  'electron',
+  'vite',
 ] as const;
 
 export type Framework = (typeof FRAMEWORKS)[number];

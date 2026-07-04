@@ -39,6 +39,9 @@ const NPM_FRAMEWORKS: Record<string, Framework> = {
   koa: 'koa',
   hono: 'hono',
   '@trpc/server': 'trpc',
+  // Lower priority than the UI frameworks above (first match wins).
+  electron: 'electron',
+  vite: 'vite',
 };
 
 const PY_FRAMEWORKS: Record<string, Framework> = {
