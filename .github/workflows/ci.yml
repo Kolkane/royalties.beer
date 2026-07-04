@@ -49,22 +49,32 @@ jobs:
           test ! -f "$ROYALTIES_CLAUDE_SETTINGS"                     # created-then-removed cleanly
           echo "smoke test OK"
 
-  # The whitelist and its human-readable spec must always change together.
+  # The whitelist (src/schema.ts) and its data lists (src/data/**, incl. the
+  # known-services privacy surface) must never change without SCHEMA.md changing
+  # in the same changeset. Runs on pull requests AND on direct pushes to main.
   schema-guard:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Fail if src/schema.ts changed without SCHEMA.md
+      - name: Fail if src/schema.ts or src/data/** changed without SCHEMA.md
         run: |
-          base='${{ github.event.pull_request.base.sha }}'
-          head='${{ github.event.pull_request.head.sha }}'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+            head='${{ github.event.pull_request.head.sha }}'
+          else
+            base='${{ github.event.before }}'
+            head='${{ github.sha }}'
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "No previous commit to diff against (new branch); skipping."
+            exit 0
+          fi
           changed="$(git diff --name-only "$base" "$head")"
           echo "Changed files:"
           echo "$changed"
-          if echo "$changed" | grep -qx 'src/schema.ts' && ! echo "$changed" | grep -qx 'SCHEMA.md'; then
-            echo "::error::src/schema.ts changed but SCHEMA.md did not. The whitelist and its spec must change in the same PR."
+          if echo "$changed" | grep -qE '^src/schema\.ts$|^src/data/' && ! echo "$changed" | grep -qx 'SCHEMA.md'; then
+            echo "::error::src/schema.ts or src/data/** changed but SCHEMA.md did not. The whitelist, its data lists, and the spec must change in the same changeset."
             exit 1
           fi
