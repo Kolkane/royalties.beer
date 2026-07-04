@@ -18,8 +18,16 @@ export const CLAUDE_SETTINGS_PATH =
 /** The one and only network destination. Override with ROYALTIES_ENDPOINT (tests). */
 export const EVENTS_ENDPOINT = env.ROYALTIES_ENDPOINT ?? 'https://ingest.royalties.sh/v1/events';
 
+/** Registration endpoint (one-time, obtains the bearer token), derived from the
+ *  events endpoint so the ROYALTIES_ENDPOINT override moves both together. */
+export const REGISTER_ENDPOINT = EVENTS_ENDPOINT.replace(/\/events\/?$/, '/register');
+
 /** Server-side deletion endpoint, derived from the events endpoint. */
 export const PURGE_ENDPOINT = EVENTS_ENDPOINT.replace(/\/events\/?$/, '/purge');
+
+/** Optional invite code sent as X-Invite-Code when registering (if the server
+ *  gates registration). Never part of any event payload. */
+export const INVITE_CODE = env.ROYALTIES_INVITE_CODE ?? '';
 
 export const paths = {
   home: ROYALTIES_HOME,

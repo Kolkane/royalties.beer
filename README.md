@@ -86,6 +86,9 @@ Devtool companies (aggregated category reports: "share of agent choice"), and ma
 **Why should I trust your backend?**
 You shouldn't have to — that's why the *collector* is the trust boundary. It can only send whitelisted metadata, so the worst-case blast radius is the table above. Backend privacy policy: [`PRIVACY.md`](./PRIVACY.md).
 
+**What's stored on my machine?**
+A `~/.royalties/` folder: your random `panelist_id`, an opaque auth token (obtained once at `init` and sent as a bearer credential so nobody can flood the panel with fabricated events — it's never event data), the pending send queue, and a local copy of your events for `export`/`stats`. Wipe all of it with `royalties purge`.
+
 ---
 
 ## Status

@@ -8,6 +8,7 @@ import { SCHEMA_VERSION, schemaHash } from './schema.js';
 import { getPanelistId, peekPanelistId } from './panelist.js';
 import { clear, readEvents, readLines } from './queue.js';
 import { flush, requestServerPurge } from './send.js';
+import { ensureRegistered } from './register.js';
 import { buildEvents, finalizeStale } from './finalize.js';
 import { isPaused } from './ignore.js';
 import { readHookDebug } from './debug.js';
@@ -24,6 +25,12 @@ export async function cmdInit(): Promise<void> {
     result.alreadyInstalled
       ? '  hooks       : already installed'
       : '  hooks       : installed (SessionStart, PostToolUse, Stop)',
+  );
+  const auth = await ensureRegistered().catch(() => null);
+  console.log(
+    auth
+      ? '  panel       : registered (auth token stored locally)'
+      : '  panel       : not registered yet — will retry automatically on the next send',
   );
   console.log('\nOnly the fields in SCHEMA.md ever leave your machine.');
   console.log('Run `royalties inspect` to see exactly what would be sent — it sends nothing.');
