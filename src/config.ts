@@ -16,7 +16,7 @@ export const CLAUDE_SETTINGS_PATH =
   env.ROYALTIES_CLAUDE_SETTINGS ?? path.join(os.homedir(), '.claude', 'settings.json');
 
 /** The one and only network destination. Override with ROYALTIES_ENDPOINT (tests). */
-export const EVENTS_ENDPOINT = env.ROYALTIES_ENDPOINT ?? 'https://ingest.royalties.sh/v1/events';
+export const EVENTS_ENDPOINT = env.ROYALTIES_ENDPOINT ?? 'https://ingest.royalties.beer/v1/events';
 
 /** Registration endpoint (one-time, obtains the bearer token), derived from the
  *  events endpoint so the ROYALTIES_ENDPOINT override moves both together. */

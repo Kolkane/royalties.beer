@@ -4,6 +4,8 @@
 
 Get paid for your metadata. Never your code.
 
+Or as we like to put it: your AI agent finally buys your beer. 🍺
+
 Every day, AI coding agents make thousands of decisions in your terminal — which package to install, which API to call, which framework to reach for. That data is worth real money to the companies being chosen. Right now, you generate it for free and nobody even measures it.
 
 royalties is an open-source collector that turns your AI coding sessions into anonymous market data — and pays you your share of what that data earns.

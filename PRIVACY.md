@@ -1,6 +1,6 @@
 # Privacy
 
-Plain language. The legal version will live at royalties.sh/privacy — this file explains what actually happens.
+Plain language. The legal version will live at royalties.beer/privacy — this file explains what actually happens.
 
 ## What we hold
 
@@ -26,7 +26,7 @@ Plain language. The legal version will live at royalties.sh/privacy — this fil
 - **Export**: `royalties export` — all your events, JSON
 - **Delete**: `royalties purge` — local queue wiped + server-side erasure within 30 days
 - **Pause**: `royalties pause`, per-project `.royaltiesignore`
-- Controller details, legal basis (consent, Art. 6(1)(a)) and DPO contact: royalties.sh/privacy
+- Controller details, legal basis (consent, Art. 6(1)(a)) and DPO contact: royalties.beer/privacy
 
 ## Retention
 
@@ -34,4 +34,4 @@ Raw events: 24 months, then reduced to aggregates. Account data: while your acco
 
 ## If we screw up
 
-A collector bug that leaks a non-whitelisted field is a critical severity issue: public disclosure in the repo, affected data deleted at ingest, post-mortem published. Report: security@royalties.sh
+A collector bug that leaks a non-whitelisted field is a critical severity issue: public disclosure in the repo, affected data deleted at ingest, post-mortem published. Report: security@royalties.beer
