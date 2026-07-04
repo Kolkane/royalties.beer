@@ -156,7 +156,7 @@ export async function cmdPurge(): Promise<void> {
   } else if (server) {
     console.log(`Server-side deletion requested for ${panelistId}.`);
   } else {
-    console.log(`Could not reach the server to erase ${panelistId}. Retry later or email security@royalties.beer.`);
+    console.log(`Could not reach the server to erase ${panelistId}. Retry later or reach us at https://x.com/royaltiesdev.`);
   }
 }
 

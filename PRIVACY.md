@@ -34,4 +34,4 @@ Raw events: 24 months, then reduced to aggregates. Account data: while your acco
 
 ## If we screw up
 
-A collector bug that leaks a non-whitelisted field is a critical severity issue: public disclosure in the repo, affected data deleted at ingest, post-mortem published. Report: security@royalties.beer
+A collector bug that leaks a non-whitelisted field is a critical severity issue: public disclosure in the repo, affected data deleted at ingest, post-mortem published. Report privately via [GitHub Security Advisories](https://github.com/Kolkane/royalties.sh/security).
