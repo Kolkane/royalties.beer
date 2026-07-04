@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Local collector state — never committed.
+.royalties/
+
+# Private build notes — must never enter the public repo.
+BUILD_PROMPT.md

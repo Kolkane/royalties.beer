@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # Build the package and drive the real binary end to end on Linux.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Smoke-test the compiled binary (init / inspect / doctor / uninstall)
+        run: |
+          set -euo pipefail
+          export ROYALTIES_HOME="$(mktemp -d)/home"
+          export ROYALTIES_CLAUDE_SETTINGS="$(mktemp -d)/claude/settings.json"
+          export ROYALTIES_ENDPOINT="http://127.0.0.1:9/v1/events"
+          node dist/cli.js init
+          grep -q '__hook' "$ROYALTIES_CLAUDE_SETTINGS"
+          grep -q '"matcher": "Bash|Write|Edit|MultiEdit"' "$ROYALTIES_CLAUDE_SETTINGS"
+          grep -q '"command": "node ' "$ROYALTIES_CLAUDE_SETTINGS"   # invoked via node, cross-platform
+          grep -q '/dist/cli.js' "$ROYALTIES_CLAUDE_SETTINGS"        # forward-slash path, no Windows backslashes
+          node dist/cli.js inspect
+          node dist/cli.js doctor
+          node dist/cli.js uninstall
+          test ! -f "$ROYALTIES_CLAUDE_SETTINGS"                     # created-then-removed cleanly
+          echo "smoke test OK"
+
+  # The whitelist and its human-readable spec must always change together.
+  schema-guard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fail if src/schema.ts changed without SCHEMA.md
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          changed="$(git diff --name-only "$base" "$head")"
+          echo "Changed files:"
+          echo "$changed"
+          if echo "$changed" | grep -qx 'src/schema.ts' && ! echo "$changed" | grep -qx 'SCHEMA.md'; then
+            echo "::error::src/schema.ts changed but SCHEMA.md did not. The whitelist and its spec must change in the same PR."
+            exit 1
+          fi
