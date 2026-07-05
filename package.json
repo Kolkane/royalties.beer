@@ -24,10 +24,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Kolkane/royalties.sh.git"
+    "url": "git+https://github.com/Kolkane/royalties.beer.git"
   },
-  "homepage": "https://royalties.beer",
-  "bugs": "https://github.com/Kolkane/royalties.sh/issues",
+  "homepage": "https://github.com/Kolkane/royalties.beer",
+  "bugs": "https://github.com/Kolkane/royalties.beer/issues",
   "scripts": {
     "build": "tsc && node scripts/copy-assets.mjs",
     "typecheck": "tsc --noEmit",
