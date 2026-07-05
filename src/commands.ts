@@ -11,7 +11,7 @@ import { flush, requestServerPurge } from './send.js';
 import { ensureRegistered } from './register.js';
 import { buildEvents, finalizeStale } from './finalize.js';
 import { isPaused } from './ignore.js';
-import { readHookDebug } from './debug.js';
+import { isHookDebug, readHookDebug } from './debug.js';
 import { deleteState, listStates } from './state.js';
 
 export async function cmdInit(): Promise<void> {
@@ -115,12 +115,14 @@ export function cmdDoctor(): void {
   console.log(`  debug       : ${isDebug() ? 'on' : 'off (set ROYALTIES_DEBUG=1 to record hook fields)'}`);
 
   const byTool = readHookDebug();
-  if (!byTool || Object.keys(byTool).length === 0) {
+  const records = byTool ? Object.values(byTool).filter(isHookDebug) : [];
+  if (records.length === 0) {
     console.log('\nNo hook payload recorded yet. Set ROYALTIES_DEBUG=1, run a Bash command in a session, then re-run `royalties doctor`.');
     return;
   }
+  records.sort((a, b) => a.at.localeCompare(b.at));
   console.log('\nLast payload per tool (field names only — never values):');
-  for (const rec of Object.values(byTool).sort((a, b) => a.at.localeCompare(b.at))) {
+  for (const rec of records) {
     console.log(JSON.stringify(rec, null, 2).split('\n').map((l) => '  ' + l).join('\n'));
     if (rec.tool_name === 'Bash') {
       console.log(

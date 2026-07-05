@@ -62,10 +62,11 @@ export function parseTranscript(text: string): SessionMetrics {
 
     if (o.type === 'assistant' && !sidechain) {
       const usage = asRecord(message.usage);
-      tokensIn +=
-        num(usage.input_tokens) +
-        num(usage.cache_read_input_tokens) +
-        num(usage.cache_creation_input_tokens);
+      // Count each input token once: fresh input + tokens written to the prompt
+      // cache. EXCLUDE cache_read_input_tokens — that is the *same* cached
+      // context re-read on every assistant turn, so summing it across a session
+      // over-counts by orders of magnitude (a 21-turn session read as ~128M).
+      tokensIn += num(usage.input_tokens) + num(usage.cache_creation_input_tokens);
       tokensOut += num(usage.output_tokens);
       if (typeof message.model === 'string') model = message.model;
       if (typeof message.stop_reason === 'string') lastStopReason = message.stop_reason;

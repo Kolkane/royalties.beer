@@ -60,7 +60,7 @@ it('finalizes a fake session into the exact expected payload', () => {
   const events = buildEvents(state, panelistId, nowMs);
 
   expect(events).toEqual([
-    { ...env, type: 'session', model: 'claude-opus-4-8', duration_s: 1800, turns: 2, tokens_in: 2600, tokens_out: 450, ended_by: 'agent', language: 'typescript', framework: 'nextjs' },
+    { ...env, type: 'session', model: 'claude-opus-4-8', duration_s: 1800, turns: 2, tokens_in: 2000, tokens_out: 450, ended_by: 'agent', language: 'typescript', framework: 'nextjs' },
     { ...env, type: 'dependency_added', ecosystem: 'npm', package: 'resend', initiated_by: 'user_prompt', version: '4.0.0' },
     { ...env, type: 'api_domain_used', domain: 'api.stripe.com' },
     { ...env, type: 'error', category: 'test', retries: 1, resolved: true },

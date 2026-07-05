@@ -143,26 +143,45 @@ function addDep(state: SessionState, dep: DepObs): void {
 function bashExitInfo(input: HookInput): { code: number | null; source: string | null } {
   if (typeof input.bash_exit_code === 'number') return { code: input.bash_exit_code, source: 'bash_exit_code' };
   // Claude Code 2.1.201 moved the tool result from `tool_output` to
-  // `tool_response` and no longer surfaces the exit code at top level. Look
-  // inside both containers: a numeric exit code first, then a boolean success
-  // flag (true -> 0, false -> 1). If neither is present we emit no error event.
+  // `tool_response` and no longer surfaces the exit code at top level. A SUCCESS
+  // result is an object ({stdout, stderr, ...}); a FAILURE arrives as a text
+  // string ending in "Error: Exit code N" (also flagged is_error). Probe every
+  // shape we've observed; if none yields a code we emit no error (fail closed).
   for (const container of ['tool_response', 'tool_output'] as const) {
     const obj = input[container];
+    if (typeof obj === 'string') {
+      const code = codeFromText(obj);
+      if (code !== null) return { code, source: `${container}:exit-code-text` };
+      continue;
+    }
     if (!obj || typeof obj !== 'object') continue;
     const rec = obj as Record<string, unknown>;
     for (const key of ['exit_code', 'exitCode', 'returnCode', 'code', 'status']) {
       if (typeof rec[key] === 'number') return { code: rec[key] as number, source: `${container}.${key}` };
     }
+    if (typeof rec.is_error === 'boolean') return { code: rec.is_error ? 1 : 0, source: `${container}.is_error` };
     for (const key of ['was_successful', 'success', 'ok']) {
       if (typeof rec[key] === 'boolean') return { code: rec[key] ? 0 : 1, source: `${container}.${key}` };
     }
+    if (typeof rec.content === 'string') {
+      const code = codeFromText(rec.content);
+      if (code !== null) return { code, source: `${container}.content:exit-code-text` };
+    }
   }
-  // Some versions surface a top-level success boolean instead of an exit code.
+  // Some versions surface a top-level success boolean / is_error instead.
+  const top = input as Record<string, unknown>;
   for (const key of ['was_successful', 'success'] as const) {
-    const v = (input as Record<string, unknown>)[key];
-    if (typeof v === 'boolean') return { code: v ? 0 : 1, source: key };
+    if (typeof top[key] === 'boolean') return { code: top[key] ? 0 : 1, source: key };
   }
+  if (typeof top.is_error === 'boolean') return { code: top.is_error ? 1 : 0, source: 'is_error' };
   return { code: null, source: null }; // fail closed: no signal -> no error event
+}
+
+/** Pull an exit code out of Claude Code's failure text ("...Error: Exit code 2").
+ *  Uses the LAST match — the trailing status line, not stray output above it. */
+function codeFromText(text: string): number | null {
+  const matches = [...text.matchAll(/\bexit code\s+(\d+)\b/gi)];
+  return matches.length === 0 ? null : Number(matches[matches.length - 1][1]);
 }
 
 function writtenContent(ti: Record<string, unknown>): string {

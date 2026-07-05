@@ -36,10 +36,22 @@ export function readHookDebug(): HookDebugByTool | null {
   if (!existsSync(paths.debug)) return null;
   try {
     const parsed = JSON.parse(readFileSync(paths.debug, 'utf8')) as unknown;
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as HookDebugByTool)
-      : null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    // Legacy 0.2.0 stored a single record (identified by a top-level string
+    // `at`) rather than a map keyed by tool_name. Wrap it so old files don't
+    // crash `doctor`; the next recorded hook rewrites the file in the new shape.
+    if (typeof (parsed as Record<string, unknown>).at === 'string') {
+      const rec = parsed as unknown as HookDebug;
+      return { [rec.tool_name ?? '(none)']: rec };
+    }
+    return parsed as HookDebugByTool;
   } catch {
     return null;
   }
+}
+
+/** A stored value that is actually a HookDebug record (object with a string
+ *  `at`). Guards `doctor` against legacy/garbage entries. */
+export function isHookDebug(v: unknown): v is HookDebug {
+  return !!v && typeof v === 'object' && typeof (v as Record<string, unknown>).at === 'string';
 }
