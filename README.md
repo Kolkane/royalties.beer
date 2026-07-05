@@ -1,9 +1,7 @@
 # royalties
 
 **Your coding sessions earn royalties now.**
-
 Get paid for your metadata. Never your code.
-
 Or as we like to put it: your AI agent finally buys your beer. 🍺
 
 Every day, AI coding agents make thousands of decisions in your terminal — which package to install, which API to call, which framework to reach for. That data is worth real money to the companies being chosen. Right now, you generate it for free and nobody even measures it.
@@ -23,7 +21,7 @@ One command. Works with Claude Code today. Cursor and Codex support on the roadm
 1. **Install the hook.** It plugs into your agent's official hook system (no binary patching, no MITM proxy).
 2. **Code like you always do.** The hook extracts *metadata only* — package names, model used, session duration, error categories. See the exact list below.
 3. **Earnings accrue.** We sell aggregated, anonymized market reports to devtool companies and investors. A share of that revenue is split across the panel, proportional to contribution.
-4. **Cash out.** Payouts via Stripe once thresholds are met.
+4. **Cash out.** Payouts via Stripe once thresholds are met. First goal: a round of beers on your agent.
 
 You also get your own stats for free: `npx royalties stats`.
 
@@ -74,7 +72,7 @@ No ads in your terminal. No sponsored spinner. Just your metadata, working for y
 Spyware hides what it takes. This repo exists so you can read every line of what leaves your machine, and `inspect` shows you the payload before you ever trust us. If you find a leak, that's a critical bug — report it and it gets fixed publicly.
 
 **How much will I earn?**
-Honest answer: it depends on panel size and data revenue, and we won't invent numbers. Earnings accrue from day one and the revenue-share formula will be published before the first payout cycle. Early panelists are weighted up.
+Honest answer: it depends on panel size and data revenue, and we won't invent numbers. Earnings accrue from day one and the revenue-share formula will be published before the first payout cycle. Early panelists are weighted up. Think beer money, not rent money — at least until the panel grows.
 
 **Does this violate my agent's ToS?**
 The collector reads your own local session logs through officially documented hook APIs. Your usage data is yours. We patch nothing.
@@ -102,6 +100,6 @@ A `~/.royalties/` folder: your random `panelist_id`, an opaque auth token (obtai
 - [ ] First public "State of Agent Choices" report — free, from panel data
 - [ ] First payout cycle
 
-⭐ Star the repo to follow the first report. Install to be in it.
+⭐ Star the repo to follow the first report. Install to be in it. First beer's on your agent.
 
 MIT — see [`LICENSE`](./LICENSE)
