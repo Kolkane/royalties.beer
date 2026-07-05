@@ -8,10 +8,10 @@ import { detectFramework, detectLanguage } from '../detect.js';
 import { depsFromCommand, depsFromManifest } from '../extract/dependency.js';
 import { domainsInContent } from '../extract/api-domain.js';
 import { classifyCommand, commandSig } from '../extract/error.js';
-import { finalizeStale } from '../finalize.js';
+import { finalize, finalizeStale } from '../finalize.js';
 import { flush } from '../send.js';
 import { recordHookDebug } from '../debug.js';
-import { loadState, newState, saveState, type DepObs, type SessionState } from '../state.js';
+import { deleteState, loadState, newState, saveState, type DepObs, type SessionState } from '../state.js';
 
 export interface HookInput {
   hook_event_name?: string;
@@ -21,6 +21,7 @@ export interface HookInput {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   tool_output?: unknown;
+  tool_response?: unknown;
   bash_exit_code?: number;
 }
 
@@ -36,6 +37,7 @@ export async function handleHook(input: HookInput): Promise<void> {
   const panelistId = getPanelistId();
   if (input.hook_event_name === 'SessionStart') onSessionStart(input);
   else if (input.hook_event_name === 'Stop') onStop(input);
+  else if (input.hook_event_name === 'SessionEnd') onSessionEnd(input, panelistId);
   finalizeStale(panelistId);
   await flush(4000).catch(() => undefined);
 }
@@ -86,10 +88,20 @@ function onPostToolUse(input: HookInput): void {
     tool_name: input.tool_name,
     top_level_keys: Object.keys(input).sort(),
     tool_input_keys: Object.keys(ti).sort(),
+    tool_response_keys: keysOf(input.tool_response),
     exit_code_found: exit.code !== null,
     exit_code: exit.code,
     exit_code_source: exit.source,
   });
+}
+
+/** Field NAMES of an object payload (sorted), or null if it isn't a plain
+ *  object. Lets `royalties doctor` reveal where a Claude Code version hides the
+ *  Bash exit code, without ever recording a value. */
+function keysOf(v: unknown): string[] | null {
+  return v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.keys(v as Record<string, unknown>).sort()
+    : null;
 }
 
 function onStop(input: HookInput): void {
@@ -97,6 +109,19 @@ function onStop(input: HookInput): void {
   if (!id) return;
   const state = loadState(id);
   if (state) saveState(state); // keep the session "fresh" so it isn't finalized mid-flight
+}
+
+// SessionEnd fires when the session actually ends (/exit, logout, clear, ...).
+// Finalize it right away so its events ship immediately instead of sitting "in
+// progress" until the 20-minute stale window elapses.
+function onSessionEnd(input: HookInput, panelistId: string): void {
+  const id = input.session_id;
+  if (!id) return;
+  const state = loadState(id);
+  if (!state) return;
+  if (input.transcript_path && !state.transcript_path) state.transcript_path = input.transcript_path;
+  finalize(state, panelistId);
+  deleteState(id);
 }
 
 function applyDetection(state: SessionState): void {
@@ -117,14 +142,27 @@ function addDep(state: SessionState, dep: DepObs): void {
  *  Returns which field it came from too, so `royalties doctor` can report it. */
 function bashExitInfo(input: HookInput): { code: number | null; source: string | null } {
   if (typeof input.bash_exit_code === 'number') return { code: input.bash_exit_code, source: 'bash_exit_code' };
-  const out = input.tool_output;
-  if (out && typeof out === 'object') {
-    const rec = out as Record<string, unknown>;
-    for (const key of ['exit_code', 'exitCode', 'code']) {
-      if (typeof rec[key] === 'number') return { code: rec[key] as number, source: `tool_output.${key}` };
+  // Claude Code 2.1.201 moved the tool result from `tool_output` to
+  // `tool_response` and no longer surfaces the exit code at top level. Look
+  // inside both containers: a numeric exit code first, then a boolean success
+  // flag (true -> 0, false -> 1). If neither is present we emit no error event.
+  for (const container of ['tool_response', 'tool_output'] as const) {
+    const obj = input[container];
+    if (!obj || typeof obj !== 'object') continue;
+    const rec = obj as Record<string, unknown>;
+    for (const key of ['exit_code', 'exitCode', 'returnCode', 'code', 'status']) {
+      if (typeof rec[key] === 'number') return { code: rec[key] as number, source: `${container}.${key}` };
+    }
+    for (const key of ['was_successful', 'success', 'ok']) {
+      if (typeof rec[key] === 'boolean') return { code: rec[key] ? 0 : 1, source: `${container}.${key}` };
     }
   }
-  return { code: null, source: null };
+  // Some versions surface a top-level success boolean instead of an exit code.
+  for (const key of ['was_successful', 'success'] as const) {
+    const v = (input as Record<string, unknown>)[key];
+    if (typeof v === 'boolean') return { code: v ? 0 : 1, source: key };
+  }
+  return { code: null, source: null }; // fail closed: no signal -> no error event
 }
 
 function writtenContent(ti: Record<string, unknown>): string {

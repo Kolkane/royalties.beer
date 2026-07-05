@@ -107,6 +107,9 @@ function ourHooks(command: string): Record<string, unknown> {
     SessionStart: entry,
     PostToolUse: { matcher: POST_TOOL_MATCHER, hooks: [{ type: 'command', command }] },
     Stop: entry,
+    // SessionEnd finalizes the session immediately on exit (no matcher = every
+    // end reason) instead of waiting out the 20-minute stale window.
+    SessionEnd: entry,
   };
 }
 

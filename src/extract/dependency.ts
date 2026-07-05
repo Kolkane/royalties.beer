@@ -14,6 +14,22 @@ const VERSION_RE = /^v?\d[\w.+-]*$/; // exact-ish version; ranges/tags are dropp
 
 // ---- from a Bash command -----------------------------------------------------
 export function depsFromCommand(command: string): DepObs[] {
+  return splitSegments(command).flatMap(depsFromSegment);
+}
+
+/** Split a chained shell command into its sub-commands, so an install that is
+ *  not the first link — e.g. `npm init -y && npm install resend` — is still
+ *  seen, and operator tokens (`&&`) between two installs are never mistaken for
+ *  a package. We only read package names from each piece; this is deliberately
+ *  not a full shell parser (quotes and subshells are out of scope). */
+function splitSegments(command: string): string[] {
+  return command
+    .split(/&&|\|\||[;\n|&]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function depsFromSegment(command: string): DepObs[] {
   const tokens = command.trim().split(/\s+/);
   if (tokens.length < 2) return [];
   const bin = tokens[0];

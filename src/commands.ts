@@ -24,7 +24,7 @@ export async function cmdInit(): Promise<void> {
   console.log(
     result.alreadyInstalled
       ? '  hooks       : already installed'
-      : '  hooks       : installed (SessionStart, PostToolUse, Stop)',
+      : '  hooks       : installed (SessionStart, PostToolUse, Stop, SessionEnd)',
   );
   const auth = await ensureRegistered().catch(() => null);
   console.log(
@@ -114,19 +114,21 @@ export function cmdDoctor(): void {
   console.log(`  sessions    : ${listStates().length} in progress`);
   console.log(`  debug       : ${isDebug() ? 'on' : 'off (set ROYALTIES_DEBUG=1 to record hook fields)'}`);
 
-  const last = readHookDebug();
-  if (!last) {
+  const byTool = readHookDebug();
+  if (!byTool || Object.keys(byTool).length === 0) {
     console.log('\nNo hook payload recorded yet. Set ROYALTIES_DEBUG=1, run a Bash command in a session, then re-run `royalties doctor`.');
     return;
   }
-  console.log('\nLast PostToolUse payload (field names only + Bash exit code):');
-  console.log(JSON.stringify(last, null, 2).split('\n').map((l) => '  ' + l).join('\n'));
-  if (last.tool_name === 'Bash') {
-    console.log(
-      last.exit_code_found
-        ? `\n  => exit code ${last.exit_code} seen via \`${last.exit_code_source}\`; a non-zero code produces an 'error' event.`
-        : "\n  => no exit-code field seen — 'error' events fail closed (none produced). The field name may differ on your Claude Code version; report it and we'll add it.",
-    );
+  console.log('\nLast payload per tool (field names only — never values):');
+  for (const rec of Object.values(byTool).sort((a, b) => a.at.localeCompare(b.at))) {
+    console.log(JSON.stringify(rec, null, 2).split('\n').map((l) => '  ' + l).join('\n'));
+    if (rec.tool_name === 'Bash') {
+      console.log(
+        rec.exit_code_found
+          ? `  => exit code ${rec.exit_code} seen via \`${rec.exit_code_source}\`; a non-zero code produces an 'error' event.`
+          : "  => no exit-code field seen — 'error' events fail closed (none produced). Check `tool_response_keys` above for the field carrying it, then report it and we'll add it.",
+      );
+    }
   }
 }
 
