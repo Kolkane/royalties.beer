@@ -3,16 +3,20 @@
 // any failure returns null and leaves the collector to try again later — nothing
 // is ever blocked on the network.
 import { INVITE_CODE, REGISTER_ENDPOINT } from './config.js';
-import { getAuth, getPanelistId, saveToken, type Auth } from './panelist.js';
+import { getAuth, markRegisterConflict, peekPanelistId, saveToken, type Auth } from './panelist.js';
 
 export async function ensureRegistered(): Promise<Auth | null> {
   return getAuth() ?? (await register());
 }
 
 export async function register(): Promise<Auth | null> {
-  // Always our own persistent id — NEVER mint a new one here. Forking the
-  // identity breaks payouts (a lost token must never change who we are).
-  const panelistId = getPanelistId();
+  // Our own persistent id, and ONLY if it already exists — NEVER mint one here.
+  // Minting identity is `init`'s job alone (it calls getPanelistId() first, then
+  // registers). The sender reaches this via a hook's flush, so peeking closes a
+  // TOCTOU hole: if a concurrent `purge` deleted panelist.json after the hook's
+  // entry guard passed, we must NOT resurrect the id the user just erased.
+  const panelistId = peekPanelistId();
+  if (!panelistId) return null;
 
   let res: Response;
   try {
@@ -38,6 +42,8 @@ export async function register(): Promise<Auth | null> {
   // 409: the server already registered this id and holds its write-once token,
   // which we no longer have. We keep the id and stay unregistered rather than
   // rotate — the token needs manual recovery, but the identity stays stable.
-  // 403 (invite required) / 5xx / anything else: give up quietly, retry later.
+  // Flag it so `royalties doctor` surfaces the stuck auth instead of failing
+  // silently. 403 (invite required) / 5xx / anything else: give up quietly.
+  if (res.status === 409) markRegisterConflict();
   return null;
 }

@@ -42,6 +42,10 @@ export const paths = {
   log: path.join(ROYALTIES_HOME, 'log.jsonl'),
   panelist: path.join(ROYALTIES_HOME, 'panelist.json'),
   paused: path.join(ROYALTIES_HOME, 'paused'),
+  // Tombstone dropped by `purge`/`uninstall` and cleared by `init`. The hook
+  // runtime checks it FIRST so a Claude Code session still running with our hooks
+  // installed goes inert immediately, without waiting to be restarted.
+  disabled: path.join(ROYALTIES_HOME, 'disabled'),
   sessionsDir: path.join(ROYALTIES_HOME, 'sessions'),
   session: (id: string) => path.join(ROYALTIES_HOME, 'sessions', sessionFile(id)),
   debug: path.join(ROYALTIES_HOME, 'last-hook.json'),

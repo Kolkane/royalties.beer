@@ -1,6 +1,6 @@
 {
   "name": "royalties",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Open-source collector that pays developers royalties on their AI coding session metadata — never their code.",
   "license": "MIT",
   "type": "module",

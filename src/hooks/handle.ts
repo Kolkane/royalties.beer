@@ -2,8 +2,8 @@
 // handleHook. It is intentionally side-effect-only and must never block or fail
 // the agent: PostToolUse just accumulates whitelisted observations into session
 // state, and only session boundaries touch the network (time-boxed, best-effort).
-import { isIgnored, isPaused } from '../ignore.js';
-import { getPanelistId, peekPanelistId } from '../panelist.js';
+import { isDisabled, isIgnored, isPaused } from '../ignore.js';
+import { peekPanelistId } from '../panelist.js';
 import { detectFramework, detectLanguage } from '../detect.js';
 import { depsFromCommand, depsFromManifest } from '../extract/dependency.js';
 import { domainsInContent } from '../extract/api-domain.js';
@@ -25,19 +25,28 @@ export interface HookInput {
 }
 
 export async function handleHook(input: HookInput): Promise<void> {
+  // The hook runtime is inert unless the user opted in via `royalties init`, and
+  // it NEVER creates identity or state itself — only `init` does. These two
+  // guards run before anything writes, so an un-init-ed machine (or one that ran
+  // purge/uninstall) produces zero side effects, even from a still-running
+  // Claude Code session whose hooks haven't been reloaded yet.
+  if (isDisabled()) return; // tombstone dropped by purge/uninstall — checked FIRST
+  const panelistId = peekPanelistId(); // peek, NEVER create: only `init` mints identity
+  if (!panelistId) return; // not initialized -> silent exit, zero writes
+
   if (isPaused()) return;
   if (isIgnored(input.cwd ?? '')) return; // .royaltiesignore -> zero events
 
   // Record the identity as THIS hook process resolves it (home + id), so
-  // `royalties doctor` can detect a CLI-vs-hook split. peek, never create.
-  recordRuntime(peekPanelistId());
+  // `royalties doctor` can detect a CLI-vs-hook split. The id already exists
+  // (guarded above), so this never creates one.
+  recordRuntime(panelistId);
 
   if (input.hook_event_name === 'PostToolUse') {
     onPostToolUse(input); // hot path: accumulate only, no network
     return;
   }
 
-  const panelistId = getPanelistId();
   if (input.hook_event_name === 'SessionStart') onSessionStart(input);
   else if (input.hook_event_name === 'Stop') onStop(input);
   else if (input.hook_event_name === 'SessionEnd') onSessionEnd(input, panelistId);

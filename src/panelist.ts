@@ -12,6 +12,10 @@ interface PanelistFile {
   created_at: string;
   token?: string;
   registered_at?: string;
+  // Set when the server 409s our registration: our id is already registered and
+  // holds its write-once token, which we no longer have. The id stays; the token
+  // is unrecoverable locally. `royalties doctor` surfaces this as stuck auth.
+  register_conflict_at?: string;
 }
 
 export interface Auth {
@@ -73,6 +77,7 @@ export function saveToken(panelistId: string, token: string): void {
   p.panelist_id = panelistId;
   p.token = token;
   p.registered_at = new Date().toISOString();
+  delete p.register_conflict_at; // we hold a valid token again — no longer stuck
   write(p);
 }
 
@@ -84,4 +89,22 @@ export function clearToken(): void {
   delete p.token;
   delete p.registered_at;
   write(p);
+}
+
+/** Record that registration was refused with a 409: the server already holds
+ *  this id's write-once token, which we lack. We keep the id (never fork) but
+ *  can't obtain a token, so `royalties doctor` reports the auth as stuck. */
+export function markRegisterConflict(): void {
+  const p = readPanelist();
+  if (!p || p.register_conflict_at) return; // no identity yet, or already marked
+  p.register_conflict_at = new Date().toISOString();
+  write(p);
+}
+
+/** True when we have an id but no token AND a prior registration was refused
+ *  (409) — the unrecoverable "stuck auth" state doctor warns about, distinct
+ *  from merely-not-registered-yet (where re-registration can still succeed). */
+export function isAuthStuck(): boolean {
+  const p = readPanelist();
+  return !!p && !p.token && !!p.register_conflict_at;
 }

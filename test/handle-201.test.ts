@@ -11,12 +11,17 @@ import { join } from 'node:path';
 import { handleHook } from '../src/hooks/handle.js';
 import { finalize } from '../src/finalize.js';
 import { loadState } from '../src/state.js';
-import { peekPanelistId } from '../src/panelist.js';
+import { getPanelistId, peekPanelistId } from '../src/panelist.js';
 import { readEvents } from '../src/queue.js';
 import { paths } from '../src/config.js';
 import { resetAll } from './util.js';
 
-beforeEach(resetAll);
+// The hook runtime is inert without an identity, so simulate `royalties init`
+// having created one before driving the hot path.
+beforeEach(() => {
+  resetAll();
+  getPanelistId();
+});
 afterEach(resetAll);
 
 const DEFAULT_RESPONSE = { stdout: '', stderr: '', interrupted: false, isImage: false, noOutputExpected: false };

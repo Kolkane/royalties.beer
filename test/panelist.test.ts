@@ -3,7 +3,7 @@
 // rather than mint a divergent one.
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { createPanelist, getAuth, getPanelistId, peekPanelistId, saveToken } from '../src/panelist.js';
+import { createPanelist, getAuth, getPanelistId, isAuthStuck, markRegisterConflict, peekPanelistId, saveToken } from '../src/panelist.js';
 import { paths } from '../src/config.js';
 import { resetAll } from './util.js';
 
@@ -40,4 +40,21 @@ it('clearToken preserves the id (a rejected token never changes identity)', () =
   expect(getAuth()).toBeNull(); // no token
   expect(peekPanelistId()).toBe(id); // but SAME id
   expect(getPanelistId()).toBe(id); // and re-resolving does not mint a new one
+});
+
+it('isAuthStuck distinguishes a 409-refused id from merely-not-registered-yet', () => {
+  const id = getPanelistId();
+  expect(isAuthStuck()).toBe(false); // fresh id, no token: unregistered, NOT stuck
+
+  markRegisterConflict(); // server 409: id registered, its token unrecoverable
+  expect(isAuthStuck()).toBe(true); // id + no token + conflict = stuck
+
+  saveToken(id, 'tok_ok'); // a token finally obtained clears the stuck state
+  expect(isAuthStuck()).toBe(false);
+});
+
+it('markRegisterConflict is a no-op when there is no identity yet', () => {
+  markRegisterConflict();
+  expect(peekPanelistId()).toBeNull(); // did not create an identity
+  expect(isAuthStuck()).toBe(false);
 });

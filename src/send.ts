@@ -26,11 +26,11 @@ export async function flush(maxMs = 8000): Promise<SendResult> {
   while (pending.length > 0 && Date.now() < deadline) {
     const batch = pending.slice(0, SEND_BATCH);
     const outcome = await postBatch(batch, auth.token, deadline);
-    if (outcome === 'unauthorized') {
-      clearToken(); // token rejected — re-register on the next flush
+    if (outcome === 'invalid-token') {
+      clearToken(); // definitive unknown_token — drop it and re-register next flush
       break;
     }
-    if (outcome !== 'ok') break; // rate-limited / client error / offline → keep queued
+    if (outcome !== 'ok') break; // rate-limited / transient 401 / 5xx / client error → keep queued & token
     sent += batch.length;
     pending = pending.slice(batch.length);
     writeLines(paths.queue, pending); // persist progress after every accepted batch
@@ -38,7 +38,7 @@ export async function flush(maxMs = 8000): Promise<SendResult> {
   return { sent, remaining: pending.length, ok: pending.length === 0 };
 }
 
-type Outcome = 'ok' | 'unauthorized' | 'rate-limited' | 'error';
+type Outcome = 'ok' | 'invalid-token' | 'rate-limited' | 'error';
 
 async function postBatch(lines: string[], token: string, deadline: number): Promise<Outcome> {
   const body = `{"events":[${lines.join(',')}]}`;
@@ -52,7 +52,12 @@ async function postBatch(lines: string[], token: string, deadline: number): Prom
         signal: AbortSignal.timeout(Math.max(500, Math.min(4000, deadline - Date.now()))),
       });
       if (res.ok) return 'ok';
-      if (res.status === 401) return 'unauthorized';
+      // A 401 only drops the token when the server says so DEFINITIVELY — the
+      // body is exactly {"error":"unknown_token"}. Every other 401 (a proxy, a
+      // transient auth outage, an empty/garbled body) is treated as transient:
+      // keep the token and retry later. Dropping a good token would force a
+      // re-register that, on a 409, strands the identity as stuck auth.
+      if (res.status === 401) return (await isUnknownToken(res)) ? 'invalid-token' : 'error';
       if (res.status === 429) return 'rate-limited';
       if (res.status < 500) return 'error'; // client error: leave queued, don't hammer
     } catch {
@@ -61,6 +66,18 @@ async function postBatch(lines: string[], token: string, deadline: number): Prom
     await sleep(Math.min(2000, 200 * 2 ** attempt));
   }
   return 'error';
+}
+
+/** True only for the ingest server's definitive token-rejection body,
+ *  {"error":"unknown_token"}. An unparseable or differently-shaped body returns
+ *  false, so a proxy error or a partial response never costs us a valid token. */
+async function isUnknownToken(res: Response): Promise<boolean> {
+  try {
+    const parsed = JSON.parse(await res.text()) as { error?: unknown };
+    return parsed?.error === 'unknown_token';
+  } catch {
+    return false;
+  }
 }
 
 /** Ask the server to erase this panelist's data (best-effort). */

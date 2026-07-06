@@ -6,16 +6,17 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { CLAUDE_SETTINGS_PATH, isDebug, paths } from './config.js';
 import { install, statusInstalled, uninstall } from './hooks/install.js';
 import { SCHEMA_VERSION, schemaHash } from './schema.js';
-import { getPanelistId, peekPanelistId } from './panelist.js';
+import { getPanelistId, isAuthStuck, peekPanelistId } from './panelist.js';
 import { clear, readEvents, readLines } from './queue.js';
 import { flush, requestServerPurge } from './send.js';
 import { ensureRegistered } from './register.js';
 import { buildEvents, finalizeStale } from './finalize.js';
-import { isPaused } from './ignore.js';
+import { disableCollector, enableCollector, isDisabled, isPaused } from './ignore.js';
 import { isHookDebug, readHookDebug, readRuntime } from './debug.js';
 import { deleteState, listStates } from './state.js';
 
 export async function cmdInit(): Promise<void> {
+  enableCollector(); // clear any purge/uninstall tombstone — this is the opt back in
   const panelistId = getPanelistId();
   const result = install();
   console.log('royalties initialized.');
@@ -40,9 +41,17 @@ export async function cmdInit(): Promise<void> {
 }
 
 export function cmdUninstall(): void {
-  const result = uninstall();
-  console.log(`Hooks removed from ${result.settingsPath} (${result.restored}).`);
-  console.log('Local data kept. Run `royalties purge` to delete it and request server-side erasure.');
+  // Drop the tombstone in `finally` so it is written even if uninstall() throws
+  // (it refuses to touch a settings.json that is not valid JSON). A still-running
+  // session must go inert on opt-out regardless of whether we could edit settings.
+  try {
+    const result = uninstall();
+    console.log(`Hooks removed from ${result.settingsPath} (${result.restored}).`);
+  } finally {
+    disableCollector();
+    console.log('Claude Code sessions already running keep their hooks until restarted — close them to stop collection immediately.');
+    console.log('Local data kept. Run `royalties purge` to delete it and request server-side erasure.');
+  }
 }
 
 export function cmdInspect(): void {
@@ -116,6 +125,13 @@ export function cmdDoctor(): void {
   console.log(`  sessions    : ${listStates().length} in progress`);
   console.log(`  debug       : ${isDebug() ? 'on' : 'off (set ROYALTIES_DEBUG=1 to record hook fields)'}`);
 
+  if (isAuthStuck()) {
+    console.log('\n=> Stuck auth: this panelist id is registered but the server rejects its token.');
+    console.log('   The write-once token cannot be recovered locally and re-registration is refused,');
+    console.log('   so events will keep failing to send. Contact @royaltiesdev (https://x.com/royaltiesdev)');
+    console.log('   to reset this id.');
+  }
+
   const rt = readRuntime();
   const cliId = peekPanelistId();
   if (rt) {
@@ -163,6 +179,13 @@ export function cmdPause(): void {
 
 export function cmdResume(): void {
   if (existsSync(paths.paused)) rmSync(paths.paused);
+  if (isDisabled()) {
+    // Resume only lifts `pause`. A purge/uninstall tombstone still holds the
+    // collector fully off, and only `init` clears it — say so instead of a
+    // misleading "Resumed.".
+    console.log('Collection is still disabled by a previous `purge`/`uninstall`. Run `royalties init` to re-enable.');
+    return;
+  }
   console.log('Resumed.');
 }
 
@@ -174,8 +197,10 @@ export async function cmdPurge(): Promise<void> {
   clear(paths.log);
   for (const state of listStates()) deleteState(state.session_id);
   if (existsSync(paths.panelist)) rmSync(paths.panelist);
+  disableCollector(); // tombstone: still-running sessions with our hooks go inert now
 
   console.log('Local queue, history and session state deleted.');
+  console.log('Claude Code sessions already running keep their hooks until restarted — close them to stop collection immediately.');
   if (!panelistId) {
     console.log('No panelist id found; nothing to erase server-side.');
   } else if (server) {

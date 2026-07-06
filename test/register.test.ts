@@ -1,12 +1,18 @@
 // Registration obtains and stores a bearer token, is idempotent, NEVER forks the
-// panelist id on a 409, and stays offline-safe.
+// panelist id on a 409, never MINTS an id (only `init` does), and is offline-safe.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { rmSync } from 'node:fs';
 import { ensureRegistered, register } from '../src/register.js';
-import { getAuth, getPanelistId, peekPanelistId } from '../src/panelist.js';
-import { REGISTER_ENDPOINT } from '../src/config.js';
+import { getAuth, getPanelistId, isAuthStuck, peekPanelistId } from '../src/panelist.js';
+import { REGISTER_ENDPOINT, paths } from '../src/config.js';
 import { resetAll } from './util.js';
 
-beforeEach(resetAll);
+// An identity always exists before registration in reality: `init` creates it,
+// then registers. Establish one so these tests exercise the real precondition.
+beforeEach(() => {
+  resetAll();
+  getPanelistId();
+});
 afterEach(() => {
   vi.restoreAllMocks();
   resetAll();
@@ -50,6 +56,7 @@ it('NEVER forks the panelist id on a 409 — keeps the id, stores no token', asy
   expect(getAuth()).toBeNull(); // nothing stored
   expect(peekPanelistId()).toBe(idBefore); // SAME id — not rotated
   expect(fetchMock).toHaveBeenCalledOnce(); // no second (rotate) attempt
+  expect(isAuthStuck()).toBe(true); // flagged so `royalties doctor` can surface it
 });
 
 it('binds the token to OUR id, ignoring a different id echoed by the server', async () => {
@@ -70,8 +77,23 @@ it('returns null and stores no token when offline', async () => {
   expect(getAuth()).toBeNull();
 });
 
-it('gives up quietly on a 403 (invite required)', async () => {
+it('never mints an identity when none exists — returns null, writes nothing, no network', async () => {
+  // Simulate a concurrent `purge` having deleted panelist.json after a hook's
+  // entry guard passed but before its flush -> register ran.
+  rmSync(paths.panelist, { force: true });
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ token: 'tok_resurrect' }), { status: 201 }));
+  vi.stubGlobal('fetch', fetchMock);
+
+  expect(await register()).toBeNull();
+  expect(peekPanelistId()).toBeNull(); // id NOT resurrected on disk
+  expect(getAuth()).toBeNull();
+  expect(fetchMock).not.toHaveBeenCalled(); // never even attempted to register
+});
+
+it('gives up quietly on a 403 (invite required) — not flagged as stuck auth', async () => {
+  getPanelistId();
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{"error":"invite"}', { status: 403 })));
   expect(await register()).toBeNull();
   expect(getAuth()).toBeNull();
+  expect(isAuthStuck()).toBe(false); // 403 is recoverable (invite), not stuck
 });

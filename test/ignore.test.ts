@@ -4,12 +4,18 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { handleHook } from '../src/hooks/handle.js';
+import { getPanelistId } from '../src/panelist.js';
 import { listStates } from '../src/state.js';
 import { readLines } from '../src/queue.js';
 import { paths } from '../src/config.js';
 import { resetAll } from './util.js';
 
-beforeEach(resetAll);
+// Identity exists (init ran), so the zero-events result comes from .royaltiesignore
+// itself, not from the un-initialized guard.
+beforeEach(() => {
+  resetAll();
+  getPanelistId();
+});
 afterEach(resetAll);
 
 it('emits nothing from an ignored project', async () => {
