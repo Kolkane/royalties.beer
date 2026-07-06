@@ -3,7 +3,7 @@
 // backoff. Offline-safe: on any failure the events stay in the queue for a later
 // attempt, and nothing here ever throws.
 import { EVENTS_ENDPOINT, PURGE_ENDPOINT, SEND_BATCH, paths } from './config.js';
-import { readLines, writeLines } from './queue.js';
+import { dropFromQueue, readLines } from './queue.js';
 import { clearToken, getAuth } from './panelist.js';
 import { ensureRegistered } from './register.js';
 
@@ -16,14 +16,19 @@ export interface SendResult {
 /** Flush pending events. Time-boxed so it can safely run inside a hook. */
 export async function flush(maxMs = 8000): Promise<SendResult> {
   const deadline = Date.now() + maxMs;
-  let pending = readLines(paths.queue);
-  if (pending.length === 0) return { sent: 0, remaining: 0, ok: true };
+  if (readLines(paths.queue).length === 0) return { sent: 0, remaining: 0, ok: true };
 
   const auth = await ensureRegistered();
-  if (!auth) return { sent: 0, remaining: pending.length, ok: false }; // offline / not registered yet
+  if (!auth) return { sent: 0, remaining: readLines(paths.queue).length, ok: false }; // offline / not registered yet
 
   let sent = 0;
-  while (pending.length > 0 && Date.now() < deadline) {
+  while (Date.now() < deadline) {
+    // Re-read the queue each iteration from disk — never work off a snapshot
+    // taken before the send. That reflects batches already dequeued and lets a
+    // line another hook appended concurrently survive.
+    const pending = readLines(paths.queue);
+    if (pending.length === 0) break;
+
     const batch = pending.slice(0, SEND_BATCH);
     const outcome = await postBatch(batch, auth.token, deadline);
     if (outcome === 'invalid-token') {
@@ -31,11 +36,33 @@ export async function flush(maxMs = 8000): Promise<SendResult> {
       break;
     }
     if (outcome !== 'ok') break; // rate-limited / transient 401 / 5xx / client error → keep queued & token
+
+    // Dequeue happens EXACTLY ONCE, and only now that a 2xx is confirmed: remove
+    // exactly the sent lines from the current queue. If the write can't be
+    // persisted (a transient lock), stop and leave them queued — the event_id
+    // makes a later re-send a server-side no-op, so this is safe, never a dup.
     sent += batch.length;
-    pending = pending.slice(batch.length);
-    writeLines(paths.queue, pending); // persist progress after every accepted batch
+    if (!(await persistDequeue(batch, deadline))) break;
   }
-  return { sent, remaining: pending.length, ok: pending.length === 0 };
+  const remaining = readLines(paths.queue).length;
+  return { sent, remaining, ok: remaining === 0 };
+}
+
+/** Remove the just-confirmed lines from the queue, retrying a transient
+ *  filesystem error (e.g. a brief Windows lock while another hook holds the
+ *  file) within the deadline. Returns whether the dequeue was persisted, and
+ *  never throws — flush must stay offline-safe. */
+async function persistDequeue(sentLines: string[], deadline: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      dropFromQueue(sentLines);
+      return true;
+    } catch {
+      if (Date.now() >= deadline) return false;
+      await sleep(Math.min(500, 25 * 2 ** attempt));
+    }
+  }
+  return false;
 }
 
 type Outcome = 'ok' | 'invalid-token' | 'rate-limited' | 'error';

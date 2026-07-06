@@ -7,6 +7,7 @@ import { fieldsFor, SCHEMA_VERSION } from '../src/schema.js';
 
 const envelope = {
   schema_version: SCHEMA_VERSION,
+  event_id: '3b241101-e2bb-4255-8caf-4136c566a962', // valid UUID v4
   panelist_id: 'p_8f3a1b2c9d4e5f60',
   ts: 1751536800, // hour-aligned
   agent: 'claude-code',
@@ -47,6 +48,14 @@ describe('serializer whitelist', () => {
     expect(() => validate({ ...validSession, secret: 'x' })).toThrow(Rejected);
     expect(() => validate({ ...validSession, extra: 1 })).toThrow(Rejected);
     expect(() => validate({ ...validSession, meta: {} })).toThrow(Rejected);
+  });
+
+  it('rejects an event with no event_id (idempotency key is required, fail closed)', () => {
+    const { event_id, ...noId } = validSession;
+    void event_id;
+    expect(() => validate(noId)).toThrow(Rejected);
+    // and a malformed one (not a UUID v4) is rejected too
+    expect(() => validate({ ...validSession, event_id: 'not-a-uuid' })).toThrow(Rejected);
   });
 
   it('rejects nested objects / arrays / null (scalars only)', () => {

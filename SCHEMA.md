@@ -9,6 +9,7 @@ The collector serializes events against this schema with `additionalProperties: 
 | Field | Type | Example | Notes |
 |---|---|---|---|
 | `schema_version` | string | `"0.1.0"` | |
+| `event_id` | string | `"3b241101-e2bb-4255-8caf-4136c566a962"` | Client-generated UUID v4, minted when the event is queued. The ingest server upserts on it, so a retried delivery never creates a duplicate row |
 | `type` | enum | `"session"` | Which event this is: `session` \| `dependency_added` \| `api_domain_used` \| `error` |
 | `panelist_id` | string | `"p_8f3a…"` | Random UUID generated at init. No link to name/email in event stream |
 | `country` | string | `"FR"` | ISO code, **added at ingest** from the request IP (which is then discarded). The collector never sends it |

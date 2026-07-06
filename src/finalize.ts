@@ -2,6 +2,7 @@
 // pure function (state + transcript -> event objects) so it is fully snapshot
 // testable; `finalize` serializes each event through the whitelist and enqueues
 // it. Anything the serializer rejects is dropped, never sent.
+import { randomUUID } from 'node:crypto';
 import { STALE_MS } from './config.js';
 import { makeEnvelope, hourTs } from './event.js';
 import { serialize, Rejected } from './serialize.js';
@@ -78,7 +79,11 @@ export function finalize(state: SessionState, panelistId: string, nowMs: number 
   let count = 0;
   for (const event of buildEvents(state, panelistId, nowMs)) {
     try {
-      enqueue(serialize(event));
+      // Stamp the idempotency key HERE, as the event is queued — not in
+      // buildEvents (which stays deterministic/snapshot-pure). It rides inside
+      // the serialized queue line, so a retry re-sends the SAME event_id and the
+      // ingest server upserts on it: a duplicate delivery never duplicates a row.
+      enqueue(serialize({ ...event, event_id: randomUUID() }));
       count++;
     } catch (err) {
       if (!(err instanceof Rejected)) throw err; // only whitelist rejections are silently dropped

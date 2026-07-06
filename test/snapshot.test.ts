@@ -61,6 +61,9 @@ it('finalizes a fake session into the exact expected payload', () => {
     { ...env, type: 'api_domain_used', domain: 'api.stripe.com' },
   ]);
 
-  // Every finalized event must survive the whitelist serializer.
-  for (const event of events) expect(() => serialize(event)).not.toThrow();
+  // Every finalized event must survive the whitelist serializer. `finalize`
+  // stamps the event_id at enqueue time (buildEvents stays deterministic above),
+  // so mirror that here before serializing.
+  const EVENT_ID = '3b241101-e2bb-4255-8caf-4136c566a962';
+  for (const event of events) expect(() => serialize({ ...event, event_id: EVENT_ID })).not.toThrow();
 });

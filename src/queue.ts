@@ -32,6 +32,17 @@ export function clear(file: string): void {
   if (existsSync(file)) rmSync(file);
 }
 
+/** Remove already-sent lines from the send queue after a confirmed 2xx. Re-reads
+ *  the CURRENT queue (never persists a stale snapshot), drops exactly the sent
+ *  lines, and rewrites the remainder — so a line another hook process appended
+ *  during the send survives, and a line already removed is a no-op. May throw if
+ *  the rewrite loses to a transient lock; the caller retries. */
+export function dropFromQueue(sentLines: string[]): void {
+  const sent = new Set(sentLines);
+  const remaining = readLines(paths.queue).filter((line) => !sent.has(line));
+  writeLines(paths.queue, remaining);
+}
+
 /** Record a serialized event: pending for send, and kept in local history. */
 export function enqueue(serialized: string): void {
   appendLine(paths.queue, serialized);

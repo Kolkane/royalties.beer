@@ -53,6 +53,9 @@ const matches =
 
 export const PATTERNS = {
   panelist_id: /^p_[0-9a-f-]{8,}$/,
+  // Client-minted UUID v4 (node:crypto randomUUID), the idempotency key: lower-
+  // case hex, version nibble 4, variant [89ab].
+  event_id: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
   agent_version: /^[0-9A-Za-z][0-9A-Za-z.\-+]{0,63}$/,
   model: /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
   version: /^v?[0-9][0-9A-Za-z.\-+]{0,63}$/,
@@ -73,6 +76,10 @@ export interface FieldSpec {
 
 const ENVELOPE: FieldSpec[] = [
   { name: 'schema_version', required: true, check: (v) => v === SCHEMA_VERSION },
+  // Idempotency key minted per event when it is queued (finalize.ts). Required:
+  // nothing may be sent without one, so a retried delivery is always de-dupable
+  // server-side (upsert on event_id) and can never create a duplicate row.
+  { name: 'event_id', required: true, check: matches(PATTERNS.event_id) },
   { name: 'panelist_id', required: true, check: matches(PATTERNS.panelist_id) },
   // Unix seconds, truncated to the hour (SCHEMA.md) — enforce the truncation.
   { name: 'ts', required: true, check: (v) => isInt(v) && (v as number) % 3600 === 0 },
