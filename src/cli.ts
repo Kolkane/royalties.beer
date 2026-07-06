@@ -15,6 +15,8 @@ import {
   cmdUninstall,
 } from './commands.js';
 import { handleHook, type HookInput } from './hooks/handle.js';
+import { isDebug } from './config.js';
+import { formatFatal } from './fatal.js';
 
 async function main(): Promise<void> {
   const command = process.argv[2];
@@ -93,4 +95,11 @@ Usage: royalties <command>
 The whitelist of what can ever be sent lives in SCHEMA.md.`);
 }
 
-void main();
+main().catch((err: unknown) => {
+  // A user-facing command failed. Print one readable line and exit non-zero
+  // instead of dumping a raw stack trace; the full stack is available with
+  // ROYALTIES_DEBUG=1. The `__hook` path swallows its own errors and exits 0
+  // before this runs, so a collector hiccup still never surfaces to the agent.
+  console.error(formatFatal(err, isDebug()));
+  process.exit(1);
+});
