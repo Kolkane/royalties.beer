@@ -12,7 +12,9 @@ export interface DepObs {
   version?: string;
 }
 
-/** One Bash tool result: category of the command + a hash to correlate retries. */
+/** One Bash tool result: category of the command + a hash to correlate retries.
+ *  Derived from the transcript at finalize (extract/session.ts), not stored on
+ *  the session state. */
 export interface ErrObs {
   category: string;
   sig: string;
@@ -31,7 +33,6 @@ export interface SessionState {
   detected?: boolean;
   deps: DepObs[];
   domains: string[];
-  errors: ErrObs[];
 }
 
 export function newState(id: string, transcriptPath: string, cwd: string): SessionState {
@@ -44,7 +45,6 @@ export function newState(id: string, transcriptPath: string, cwd: string): Sessi
     updated_at: now,
     deps: [],
     domains: [],
-    errors: [],
   };
 }
 

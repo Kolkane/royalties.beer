@@ -68,34 +68,6 @@ it('never emits shell operators or later words as packages', async () => {
   expect(packagesOf(await depsFor('npm install --save-dev typescript && npm run build'))).toEqual(['typescript']);
 });
 
-it('reads a numeric exit code from tool_response (produces an error event)', async () => {
-  const events = await depsFor('npm run build', { ...DEFAULT_RESPONSE, exit_code: 2 });
-  const errs = events.filter((e) => e.type === 'error');
-  expect(errs).toHaveLength(1);
-  expect(errs[0].category).toBe('build');
-});
-
-it('reads the exit code from a STRING tool_response (2.1.201 failure text)', async () => {
-  // A failed Bash result arrives as text ending in "Error: Exit code N".
-  const events = await depsFor('npm run build', 'Command failed.\nsome output\nError: Exit code 2');
-  const errs = events.filter((e) => e.type === 'error');
-  expect(errs).toHaveLength(1);
-  expect(errs[0].category).toBe('build');
-});
-
-it('treats is_error:true in tool_response as a failure', async () => {
-  const events = await depsFor('npm test', { ...DEFAULT_RESPONSE, is_error: true });
-  const errs = events.filter((e) => e.type === 'error');
-  expect(errs).toHaveLength(1);
-  expect(errs[0].category).toBe('test');
-});
-
-it('emits no error when tool_response carries no failure signal (fail closed)', async () => {
-  // The default success object has no exit code / is_error / success flag.
-  const events = await depsFor('npm run build');
-  expect(events.filter((e) => e.type === 'error')).toHaveLength(0);
-});
-
 it('SessionEnd finalizes the session immediately — no 20-minute wait', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'royalties-end-'));
   const transcriptPath = join(dir, 'session.jsonl');

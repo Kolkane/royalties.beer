@@ -46,10 +46,6 @@ it('finalizes a fake session into the exact expected payload', () => {
     detected: true,
     deps: [{ ecosystem: 'npm', package: 'resend', version: '4.0.0' }],
     domains: ['api.stripe.com', 'api.stripe.com'], // duplicate must collapse
-    errors: [
-      { category: 'test', sig: 'aaa', ok: false },
-      { category: 'test', sig: 'aaa', ok: true },
-    ],
   };
 
   const panelistId = 'p_8f3a1b2c9d4e5f60';
@@ -63,7 +59,6 @@ it('finalizes a fake session into the exact expected payload', () => {
     { ...env, type: 'session', model: 'claude-opus-4-8', duration_s: 1800, turns: 2, tokens_in: 2000, tokens_out: 450, ended_by: 'agent', language: 'typescript', framework: 'nextjs' },
     { ...env, type: 'dependency_added', ecosystem: 'npm', package: 'resend', initiated_by: 'user_prompt', version: '4.0.0' },
     { ...env, type: 'api_domain_used', domain: 'api.stripe.com' },
-    { ...env, type: 'error', category: 'test', retries: 1, resolved: true },
   ]);
 
   // Every finalized event must survive the whitelist serializer.

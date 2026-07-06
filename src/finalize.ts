@@ -12,7 +12,12 @@ import { deleteState, listStates, type SessionState, type DepObs } from './state
 
 type EventObj = Record<string, string | number | boolean>;
 
-export function buildEvents(state: SessionState, panelistId: string, nowMs: number): EventObj[] {
+export function buildEvents(
+  state: SessionState,
+  panelistId: string,
+  nowMs: number,
+  opts: { preview?: boolean } = {},
+): EventObj[] {
   const metrics = readTranscript(state.transcript_path);
   const agentVersion = state.agent_version ?? metrics?.agent_version ?? 'unknown';
   const ts = hourTs(nowMs);
@@ -28,8 +33,10 @@ export function buildEvents(state: SessionState, panelistId: string, nowMs: numb
       turns: metrics.turns,
       tokens_in: metrics.tokens_in,
       tokens_out: metrics.tokens_out,
-      ended_by: metrics.ended_by,
     };
+    // A preview (`royalties inspect`) is of an IN-PROGRESS session — it hasn't
+    // ended, so we don't assert an ended_by for it.
+    if (!opts.preview) session.ended_by = metrics.ended_by;
     if (state.language) session.language = state.language;
     if (state.framework) session.framework = state.framework;
     events.push(session);
@@ -52,7 +59,7 @@ export function buildEvents(state: SessionState, panelistId: string, nowMs: numb
     events.push({ ...base(), type: 'api_domain_used', domain });
   }
 
-  for (const err of errorEvents(state.errors)) {
+  for (const err of errorEvents(metrics ? metrics.errors : [])) {
     events.push({
       ...base(),
       type: 'error',

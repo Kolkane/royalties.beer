@@ -20,3 +20,15 @@ it('excludes cache_read_input_tokens from tokens_in', () => {
   expect(m.tokens_in).toBe(7010);
   expect(m.tokens_out).toBe(340);
 });
+
+it('computes ACTIVE duration, excluding idle/resume gaps >= 20 min', () => {
+  const text = transcript([
+    { type: 'assistant', timestamp: '2026-07-04T10:00:00.000Z', message: { model: 'm', stop_reason: 'end_turn', usage: {} } },
+    { type: 'assistant', timestamp: '2026-07-04T10:05:00.000Z', message: { model: 'm', stop_reason: 'end_turn', usage: {} } },
+    // conversation resumed two days later:
+    { type: 'assistant', timestamp: '2026-07-06T10:00:00.000Z', message: { model: 'm', stop_reason: 'end_turn', usage: {} } },
+    { type: 'assistant', timestamp: '2026-07-06T10:03:00.000Z', message: { model: 'm', stop_reason: 'end_turn', usage: {} } },
+  ]);
+  // 5min (300s) + [2-day gap excluded] + 3min (180s) = 480s, not ~2 days.
+  expect(parseTranscript(text).duration_s).toBe(480);
+});

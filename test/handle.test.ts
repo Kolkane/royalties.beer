@@ -16,15 +16,14 @@ import { resetAll } from './util.js';
 beforeEach(resetAll);
 afterEach(resetAll);
 
-it('accumulates deps, domains and errors, then finalizes to valid events', async () => {
+it('accumulates deps and domains on the hot path, then finalizes to valid events', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'royalties-proj-'));
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { next: '14.0.0' } }));
   writeFileSync(join(dir, 'tsconfig.json'), '{}');
 
   const base = { session_id: 's1', transcript_path: join(dir, 'missing.jsonl'), cwd: dir };
   await handleHook({ ...base, hook_event_name: 'SessionStart' });
-  await handleHook({ ...base, hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'npm install resend@4.0.0' }, bash_exit_code: 0 });
-  await handleHook({ ...base, hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'npm test' }, bash_exit_code: 1 });
+  await handleHook({ ...base, hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'npm install resend@4.0.0' } });
   await handleHook({ ...base, hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: 'client.ts', content: 'fetch("https://api.stripe.com/v1/charges")' } });
   await handleHook({ ...base, hook_event_name: 'Stop' });
 
@@ -44,9 +43,7 @@ it('accumulates deps, domains and errors, then finalizes to valid events', async
   const types = events.map((e) => e.type);
   expect(types).toContain('dependency_added');
   expect(types).toContain('api_domain_used');
-  expect(types).toContain('error');
   expect(events.find((e) => e.type === 'dependency_added')?.package).toBe('resend');
   expect(events.find((e) => e.type === 'api_domain_used')?.domain).toBe('api.stripe.com');
-  expect(events.find((e) => e.type === 'error')?.category).toBe('test');
   for (const event of events) expect(isAllowed(event)).toBe(true);
 });

@@ -51,10 +51,11 @@ export function errorEvents(observations: ErrObs[]): ErrorEvent[] {
   for (const list of bySig.values()) {
     const fails = list.filter((o) => !o.ok);
     if (fails.length === 0) continue;
+    const firstFail = list.findIndex((o) => !o.ok);
     events.push({
       category: fails[0].category,
       retries: fails.length,
-      resolved: list.some((o) => o.ok),
+      resolved: list.slice(firstFail + 1).some((o) => o.ok), // a later run of the same command succeeded
     });
   }
   return events;

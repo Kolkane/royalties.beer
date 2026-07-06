@@ -55,7 +55,7 @@ export function cmdInspect(): void {
     const panelistId = peekPanelistId() ?? 'p_preview';
     console.log(`\nPreview of ${states.length} in-progress session(s) — not yet queued:`);
     for (const state of states) {
-      for (const event of buildEvents(state, panelistId, Date.now())) {
+      for (const event of buildEvents(state, panelistId, Date.now(), { preview: true })) {
         console.log('  ' + JSON.stringify(event));
       }
     }
@@ -127,8 +127,8 @@ export function cmdDoctor(): void {
     if (rec.tool_name === 'Bash') {
       console.log(
         rec.exit_code_found
-          ? `  => exit code ${rec.exit_code} seen via \`${rec.exit_code_source}\`; a non-zero code produces an 'error' event.`
-          : "  => no exit-code field seen — 'error' events fail closed (none produced). Check `tool_response_keys` above for the field carrying it, then report it and we'll add it.",
+          ? `  => exit code ${rec.exit_code} present in the hook via \`${rec.exit_code_source}\` (informational).`
+          : '  => no exit code in the hook payload (expected on 2.1.201). error events are derived from the transcript at session end, not from the hook.',
       );
     }
   }

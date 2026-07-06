@@ -7,7 +7,6 @@ import { getPanelistId } from '../panelist.js';
 import { detectFramework, detectLanguage } from '../detect.js';
 import { depsFromCommand, depsFromManifest } from '../extract/dependency.js';
 import { domainsInContent } from '../extract/api-domain.js';
-import { classifyCommand, commandSig } from '../extract/error.js';
 import { finalize, finalizeStale } from '../finalize.js';
 import { flush } from '../send.js';
 import { recordHookDebug } from '../debug.js';
@@ -60,15 +59,15 @@ function onPostToolUse(input: HookInput): void {
   applyDetection(state);
 
   const ti = input.tool_input ?? {};
+  // `exit` is diagnostic only (surfaced by `royalties doctor`). error events are
+  // NOT derived here — 2.1.201's hook payload carries no failure signal — they
+  // come from the transcript at session finalize (see extract/session.ts).
   const exit = { code: null as number | null, source: null as string | null };
   if (input.tool_name === 'Bash') {
     const command = typeof ti.command === 'string' ? ti.command : '';
     if (command) {
       for (const dep of depsFromCommand(command)) addDep(state, dep);
       Object.assign(exit, bashExitInfo(input));
-      if (exit.code !== null) {
-        state.errors.push({ category: classifyCommand(command), sig: commandSig(command), ok: exit.code === 0 });
-      }
     }
   } else if (input.tool_name === 'Write' || input.tool_name === 'Edit' || input.tool_name === 'MultiEdit') {
     const content = writtenContent(ti);

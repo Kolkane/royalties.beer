@@ -4,6 +4,9 @@
 // transient lowercased copy of user-turn text used solely to compute the
 // dependency `initiated_by` boolean; it is never stored or sent.
 import { existsSync, readFileSync } from 'node:fs';
+import { STALE_MS } from '../config.js';
+import { classifyCommand, commandSig } from './error.js';
+import type { ErrObs } from '../state.js';
 
 export interface SessionMetrics {
   model?: string;
@@ -14,6 +17,9 @@ export interface SessionMetrics {
   ended_by: 'user' | 'agent' | 'error';
   agent_version?: string;
   userText: string;
+  /** Bash tool results paired from the transcript, one per run (ok unless the
+   *  result was flagged is_error). Collapsed into error events at finalize. */
+  errors: ErrObs[];
 }
 
 export function readTranscript(path: string): SessionMetrics | null {
@@ -26,8 +32,7 @@ export function readTranscript(path: string): SessionMetrics | null {
 }
 
 export function parseTranscript(text: string): SessionMetrics {
-  let firstTs = Infinity;
-  let lastTs = -Infinity;
+  const timestamps: number[] = [];
   let turns = 0;
   let tokensIn = 0;
   let tokensOut = 0;
@@ -35,6 +40,8 @@ export function parseTranscript(text: string): SessionMetrics {
   let agentVersion: string | undefined;
   let lastStopReason: string | undefined;
   const userParts: string[] = [];
+  const toolUses = new Map<string, { name: string; command: string }>();
+  const errors: ErrObs[] = [];
 
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
@@ -46,10 +53,7 @@ export function parseTranscript(text: string): SessionMetrics {
     }
 
     const ts = typeof o.timestamp === 'string' ? Date.parse(o.timestamp) : NaN;
-    if (!Number.isNaN(ts)) {
-      firstTs = Math.min(firstTs, ts);
-      lastTs = Math.max(lastTs, ts);
-    }
+    if (!Number.isNaN(ts)) timestamps.push(ts);
     if (typeof o.version === 'string') agentVersion = o.version;
 
     const message = asRecord(o.message);
@@ -71,21 +75,61 @@ export function parseTranscript(text: string): SessionMetrics {
       if (typeof message.model === 'string') model = message.model;
       if (typeof message.stop_reason === 'string') lastStopReason = message.stop_reason;
     }
-  }
 
-  const duration_s =
-    firstTs <= lastTs ? Math.max(0, Math.round((lastTs - firstTs) / 1000)) : 0;
+    if (!sidechain && Array.isArray(message.content)) collectToolIo(message.content, toolUses, errors);
+  }
 
   return {
     model,
-    duration_s,
+    duration_s: activeDuration(timestamps),
     turns,
     tokens_in: tokensIn,
     tokens_out: tokensOut,
     ended_by: lastStopReason === 'end_turn' || lastStopReason === undefined ? 'agent' : 'user',
     agent_version: agentVersion,
     userText: userParts.join('\n').toLowerCase(),
+    errors,
   };
+}
+
+/** Pair Bash tool_use blocks with their tool_result, recording one observation
+ *  per Bash run (ok unless the result is flagged is_error). The assistant
+ *  tool_use always precedes its user tool_result in the transcript, so a single
+ *  forward pass with a shared id->command map suffices. Non-Bash tools and
+ *  sidechain (sub-agent) turns are ignored. */
+function collectToolIo(
+  content: unknown[],
+  toolUses: Map<string, { name: string; command: string }>,
+  errors: ErrObs[],
+): void {
+  for (const block of content) {
+    const b = asRecord(block);
+    if (b.type === 'tool_use' && typeof b.id === 'string') {
+      const input = asRecord(b.input);
+      toolUses.set(b.id, {
+        name: typeof b.name === 'string' ? b.name : '',
+        command: typeof input.command === 'string' ? input.command : '',
+      });
+    } else if (b.type === 'tool_result' && typeof b.tool_use_id === 'string') {
+      const use = toolUses.get(b.tool_use_id);
+      if (use && use.name === 'Bash' && use.command) {
+        errors.push({ category: classifyCommand(use.command), sig: commandSig(use.command), ok: b.is_error !== true });
+      }
+    }
+  }
+}
+
+/** Time actually spent working: the sum of gaps between consecutive events,
+ *  ignoring any gap >= STALE_MS. A resumed conversation spanning days would
+ *  otherwise report last_ts - first_ts (e.g. 36h) as the session duration. */
+function activeDuration(timestamps: number[]): number {
+  const sorted = [...timestamps].sort((a, b) => a - b);
+  let activeMs = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i] - sorted[i - 1];
+    if (gap > 0 && gap < STALE_MS) activeMs += gap;
+  }
+  return Math.round(activeMs / 1000);
 }
 
 function asRecord(v: unknown): Record<string, unknown> {
