@@ -1,6 +1,7 @@
 // The user-facing commands. Each is small and does exactly what it says; none of
 // them sends anything except `init`/`purge` (delivery + server-side deletion) and
 // they all operate on local files first.
+import os from 'node:os';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { CLAUDE_SETTINGS_PATH, isDebug, paths } from './config.js';
 import { install, statusInstalled, uninstall } from './hooks/install.js';
@@ -11,7 +12,7 @@ import { flush, requestServerPurge } from './send.js';
 import { ensureRegistered } from './register.js';
 import { buildEvents, finalizeStale } from './finalize.js';
 import { isPaused } from './ignore.js';
-import { isHookDebug, readHookDebug } from './debug.js';
+import { isHookDebug, readHookDebug, readRuntime } from './debug.js';
 import { deleteState, listStates } from './state.js';
 
 export async function cmdInit(): Promise<void> {
@@ -107,12 +108,32 @@ export function cmdDoctor(): void {
   console.log(`  schema      : v${SCHEMA_VERSION} (${schemaHash()})`);
   console.log(`  panelist id : ${peekPanelistId() ?? '(none yet)'}`);
   console.log(`  home        : ${paths.home}`);
+  console.log(`  homedir     : ${os.homedir()} (USERPROFILE=${process.env.USERPROFILE ?? '?'}${process.env.HOME ? ', HOME=' + process.env.HOME : ''})`);
   console.log(`  settings    : ${CLAUDE_SETTINGS_PATH}`);
   console.log(`  hooks       : ${statusInstalled() ? 'installed' : 'not installed'}`);
   console.log(`  paused      : ${isPaused()}`);
   console.log(`  queued/log  : ${readLines(paths.queue).length} pending, ${readLines(paths.log).length} in history`);
   console.log(`  sessions    : ${listStates().length} in progress`);
   console.log(`  debug       : ${isDebug() ? 'on' : 'off (set ROYALTIES_DEBUG=1 to record hook fields)'}`);
+
+  const rt = readRuntime();
+  const cliId = peekPanelistId();
+  if (rt) {
+    console.log('\nHook runtime (identity as the hook process last resolved it):');
+    console.log(`  home        : ${rt.home}`);
+    console.log(`  panelist id : ${rt.panelist_id ?? '(none)'}`);
+    console.log(`  homedir     : ${rt.homedir}`);
+    console.log(`  at          : ${rt.at}`);
+    if (rt.panelist_id && cliId && rt.panelist_id !== cliId) {
+      console.log(`  => MISMATCH: hook id ${rt.panelist_id} != CLI id ${cliId} — identity split!`);
+    } else if (rt.home !== paths.home) {
+      console.log('  => MISMATCH: hook home != CLI home — identity split risk!');
+    }
+  } else if (statusInstalled()) {
+    console.log('\n=> Hooks are installed but this home has no hook-runtime marker yet.');
+    console.log('   If you have coded since installing, the hook may resolve a different');
+    console.log('   home than this CLI (a panelist identity split). Compare homedir/USERPROFILE.');
+  }
 
   const byTool = readHookDebug();
   const records = byTool ? Object.values(byTool).filter(isHookDebug) : [];

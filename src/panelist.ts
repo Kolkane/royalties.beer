@@ -39,9 +39,23 @@ export function getPanelistId(): string {
 }
 
 export function createPanelist(): string {
+  mkdirSync(paths.home, { recursive: true });
   const file: PanelistFile = { panelist_id: 'p_' + randomUUID(), created_at: new Date().toISOString() };
-  write(file);
-  return file.panelist_id;
+  try {
+    // 'wx' fails if the file already exists, so a racing hook + CLI (or any
+    // second process) can never overwrite an established identity — the first
+    // writer wins and everyone else adopts it. Forking the id breaks payouts.
+    writeFileSync(paths.panelist, JSON.stringify(file, null, 2) + '\n', { flag: 'wx' });
+    return file.panelist_id;
+  } catch {
+    // Someone created it first (or is mid-write); adopt their id, never mint a
+    // divergent one. Spin briefly in the rare create-but-not-yet-written window.
+    for (let i = 0; i < 50; i++) {
+      const existing = readPanelist();
+      if (existing?.panelist_id) return existing.panelist_id;
+    }
+    return readPanelist()?.panelist_id ?? file.panelist_id;
+  }
 }
 
 export function peekPanelistId(): string | null {
@@ -62,19 +76,12 @@ export function saveToken(panelistId: string, token: string): void {
   write(p);
 }
 
-/** Forget a token the server rejected (401); we re-register on the next send. */
+/** Forget a token the server rejected (401); we re-register on the next send.
+ *  The panelist id is preserved — a rejected token never changes our identity. */
 export function clearToken(): void {
   const p = readPanelist();
   if (!p?.token) return;
   delete p.token;
   delete p.registered_at;
   write(p);
-}
-
-/** Mint a fresh id (dropping any token), used when the server says our id is
- *  already registered but we no longer hold its token. */
-export function rotatePanelist(): string {
-  const file: PanelistFile = { panelist_id: 'p_' + randomUUID(), created_at: new Date().toISOString() };
-  write(file);
-  return file.panelist_id;
 }

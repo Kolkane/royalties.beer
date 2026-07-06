@@ -1,8 +1,8 @@
-// Registration obtains and stores a bearer token, is idempotent, recovers from a
-// 409, and stays offline-safe.
+// Registration obtains and stores a bearer token, is idempotent, NEVER forks the
+// panelist id on a 409, and stays offline-safe.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ensureRegistered, register } from '../src/register.js';
-import { getAuth, peekPanelistId } from '../src/panelist.js';
+import { getAuth, getPanelistId, peekPanelistId } from '../src/panelist.js';
 import { REGISTER_ENDPOINT } from '../src/config.js';
 import { resetAll } from './util.js';
 
@@ -40,22 +40,26 @@ it('ensureRegistered reuses a stored token without a second call', async () => {
   expect(fetchMock).toHaveBeenCalledOnce();
 });
 
-it('recovers from a 409 by rotating to a fresh panelist id', async () => {
-  let calls = 0;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_url: string, init: { body: string }) => {
-      calls++;
-      if (calls === 1) return new Response('{"error":"panelist already registered"}', { status: 409 });
-      const body = JSON.parse(init.body) as { panelist_id: string };
-      return new Response(JSON.stringify({ panelist_id: body.panelist_id, token: 'tok_new' }), { status: 201 });
-    }),
-  );
+it('NEVER forks the panelist id on a 409 — keeps the id, stores no token', async () => {
+  const idBefore = getPanelistId(); // establish a stable identity first
+  const fetchMock = vi.fn(async () => new Response('{"error":"panelist already registered"}', { status: 409 }));
+  vi.stubGlobal('fetch', fetchMock);
 
   const auth = await register();
-  expect(auth?.token).toBe('tok_new');
-  expect(auth?.panelistId).toBe(peekPanelistId());
-  expect(calls).toBe(2);
+  expect(auth).toBeNull(); // no token obtained
+  expect(getAuth()).toBeNull(); // nothing stored
+  expect(peekPanelistId()).toBe(idBefore); // SAME id — not rotated
+  expect(fetchMock).toHaveBeenCalledOnce(); // no second (rotate) attempt
+});
+
+it('binds the token to OUR id, ignoring a different id echoed by the server', async () => {
+  const idBefore = getPanelistId();
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ panelist_id: 'p_SERVER_DIFFERENT', token: 'tok_z' }), { status: 201 })));
+
+  const auth = await register();
+  expect(auth?.panelistId).toBe(idBefore); // our id, not the server's
+  expect(peekPanelistId()).toBe(idBefore);
+  expect(getAuth()).toEqual({ panelistId: idBefore, token: 'tok_z' });
 });
 
 it('returns null and stores no token when offline', async () => {

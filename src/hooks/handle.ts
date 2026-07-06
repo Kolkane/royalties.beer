@@ -3,13 +3,13 @@
 // the agent: PostToolUse just accumulates whitelisted observations into session
 // state, and only session boundaries touch the network (time-boxed, best-effort).
 import { isIgnored, isPaused } from '../ignore.js';
-import { getPanelistId } from '../panelist.js';
+import { getPanelistId, peekPanelistId } from '../panelist.js';
 import { detectFramework, detectLanguage } from '../detect.js';
 import { depsFromCommand, depsFromManifest } from '../extract/dependency.js';
 import { domainsInContent } from '../extract/api-domain.js';
 import { finalize, finalizeStale } from '../finalize.js';
 import { flush } from '../send.js';
-import { recordHookDebug } from '../debug.js';
+import { recordHookDebug, recordRuntime } from '../debug.js';
 import { deleteState, loadState, newState, saveState, type DepObs, type SessionState } from '../state.js';
 
 export interface HookInput {
@@ -27,6 +27,10 @@ export interface HookInput {
 export async function handleHook(input: HookInput): Promise<void> {
   if (isPaused()) return;
   if (isIgnored(input.cwd ?? '')) return; // .royaltiesignore -> zero events
+
+  // Record the identity as THIS hook process resolves it (home + id), so
+  // `royalties doctor` can detect a CLI-vs-hook split. peek, never create.
+  recordRuntime(peekPanelistId());
 
   if (input.hook_event_name === 'PostToolUse') {
     onPostToolUse(input); // hot path: accumulate only, no network

@@ -6,6 +6,7 @@
 // delivers the exit code in (error events fail closed when none is present).
 // The last payload is kept PER tool_name, so a Bash record isn't overwritten by
 // the next Write/Edit.
+import os from 'node:os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isDebug, paths } from './config.js';
 
@@ -54,4 +55,47 @@ export function readHookDebug(): HookDebugByTool | null {
  *  `at`). Guards `doctor` against legacy/garbage entries. */
 export function isHookDebug(v: unknown): v is HookDebug {
   return !!v && typeof v === 'object' && typeof (v as Record<string, unknown>).at === 'string';
+}
+
+/** Identity as the HOOK process resolved it — always recorded (not gated by
+ *  ROYALTIES_DEBUG) so `doctor` can prove the hook and CLI share one home + id.
+ *  If the hook resolves a different home, this file lands there and `doctor`
+ *  (reading the CLI's home) sees none — itself the tell for an identity split. */
+export interface RuntimeMarker {
+  at: string;
+  home: string;
+  panelist_id: string | null;
+  homedir: string;
+  userprofile?: string;
+  home_env?: string;
+}
+
+export function recordRuntime(panelistId: string | null): void {
+  try {
+    const prev = readRuntime();
+    if (prev && prev.home === paths.home && prev.panelist_id === panelistId && prev.homedir === os.homedir()) {
+      return; // unchanged — avoid rewriting on every hook invocation
+    }
+    mkdirSync(paths.home, { recursive: true });
+    const marker: RuntimeMarker = {
+      at: new Date().toISOString(),
+      home: paths.home,
+      panelist_id: panelistId,
+      homedir: os.homedir(),
+      userprofile: process.env.USERPROFILE,
+      home_env: process.env.HOME,
+    };
+    writeFileSync(paths.runtime, JSON.stringify(marker, null, 2));
+  } catch {
+    // Diagnostics only — must never affect the hook.
+  }
+}
+
+export function readRuntime(): RuntimeMarker | null {
+  if (!existsSync(paths.runtime)) return null;
+  try {
+    return JSON.parse(readFileSync(paths.runtime, 'utf8')) as RuntimeMarker;
+  } catch {
+    return null;
+  }
 }

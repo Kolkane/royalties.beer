@@ -8,7 +8,14 @@ const env = process.env;
 /** The only agent this collector supports today. */
 export const AGENT = 'claude-code';
 
-/** Root of local state. Override with ROYALTIES_HOME (tests, custom installs). */
+/** Root of local state — the panelist identity lives here, so it MUST resolve
+ *  identically for the CLI and the hook runtime. `os.homedir()` is the single
+ *  resolver: on Windows it reads USERPROFILE (never HOME), so it is stable across
+ *  shells, reboots and the CLI-vs-hook split. Do NOT switch this to HOME or any
+ *  other base — existing panelists already keep their id under this path, so
+ *  changing it would fork every identity. Override only via ROYALTIES_HOME (for
+ *  tests / custom installs); if you set it, set it for BOTH the CLI and the hook
+ *  or the panelist id will split. */
 export const ROYALTIES_HOME = env.ROYALTIES_HOME ?? path.join(os.homedir(), '.royalties');
 
 /** Claude Code settings file we install hooks into. Override for tests. */
@@ -38,6 +45,7 @@ export const paths = {
   sessionsDir: path.join(ROYALTIES_HOME, 'sessions'),
   session: (id: string) => path.join(ROYALTIES_HOME, 'sessions', sessionFile(id)),
   debug: path.join(ROYALTIES_HOME, 'last-hook.json'),
+  runtime: path.join(ROYALTIES_HOME, 'runtime.json'),
 };
 
 /** ROYALTIES_DEBUG=1 records the last hook's field names for `royalties doctor`.
