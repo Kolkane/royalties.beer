@@ -46,6 +46,10 @@ export const paths = {
   // runtime checks it FIRST so a Claude Code session still running with our hooks
   // installed goes inert immediately, without waiting to be restarted.
   disabled: path.join(ROYALTIES_HOME, 'disabled'),
+  // Stable copy of the compiled CLI. `init` copies dist/ here and points the
+  // hooks at it, so they never reference npm's evictable _npx cache (which npx
+  // can delete at any time, silently killing the hooks).
+  bin: path.join(ROYALTIES_HOME, 'bin'),
   sessionsDir: path.join(ROYALTIES_HOME, 'sessions'),
   session: (id: string) => path.join(ROYALTIES_HOME, 'sessions', sessionFile(id)),
   debug: path.join(ROYALTIES_HOME, 'last-hook.json'),

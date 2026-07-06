@@ -4,7 +4,7 @@
 import os from 'node:os';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { CLAUDE_SETTINGS_PATH, isDebug, paths } from './config.js';
-import { install, statusInstalled, uninstall } from './hooks/install.js';
+import { install, installedHookCliPath, statusInstalled, uninstall } from './hooks/install.js';
 import { SCHEMA_VERSION, schemaHash } from './schema.js';
 import { getPanelistId, isAuthStuck, peekPanelistId } from './panelist.js';
 import { clear, readEvents, readLines } from './queue.js';
@@ -28,6 +28,7 @@ export async function cmdInit(): Promise<void> {
       ? '  hooks       : already installed'
       : '  hooks       : installed (SessionStart, PostToolUse, Stop, SessionEnd)',
   );
+  console.log(`  runtime     : ${paths.bin} (stable copy — survives npx cache eviction)`);
   const auth = await ensureRegistered().catch(() => null);
   console.log(
     auth
@@ -120,6 +121,7 @@ export function cmdDoctor(): void {
   console.log(`  homedir     : ${os.homedir()} (USERPROFILE=${process.env.USERPROFILE ?? '?'}${process.env.HOME ? ', HOME=' + process.env.HOME : ''})`);
   console.log(`  settings    : ${CLAUDE_SETTINGS_PATH}`);
   console.log(`  hooks       : ${statusInstalled() ? 'installed' : 'not installed'}`);
+  console.log(`  hook runtime: ${installedHookCliPath() ?? '(hooks not installed)'}`);
   console.log(`  paused      : ${isPaused()}`);
   console.log(`  queued/log  : ${readLines(paths.queue).length} pending, ${readLines(paths.log).length} in history`);
   console.log(`  sessions    : ${listStates().length} in progress`);

@@ -3,6 +3,7 @@
 // the agent: PostToolUse just accumulates whitelisted observations into session
 // state, and only session boundaries touch the network (time-boxed, best-effort).
 import { isDisabled, isIgnored, isPaused } from '../ignore.js';
+import { isSupersededHookRuntime } from './install.js';
 import { peekPanelistId } from '../panelist.js';
 import { detectFramework, detectLanguage } from '../detect.js';
 import { depsFromCommand, depsFromManifest } from '../extract/dependency.js';
@@ -33,6 +34,11 @@ export async function handleHook(input: HookInput): Promise<void> {
   if (isDisabled()) return; // tombstone dropped by purge/uninstall — checked FIRST
   const panelistId = peekPanelistId(); // peek, NEVER create: only `init` mints identity
   if (!panelistId) return; // not initialized -> silent exit, zero writes
+
+  // Self-heal: if we are running from a path the installed hooks no longer point
+  // at (e.g. a lingering _npx-cache build after `init` relocated the hooks to
+  // ~/.royalties/bin), no-op safely rather than collect from a superseded copy.
+  if (isSupersededHookRuntime()) return;
 
   if (isPaused()) return;
   if (isIgnored(input.cwd ?? '')) return; // .royaltiesignore -> zero events
