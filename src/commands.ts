@@ -6,7 +6,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { CLAUDE_SETTINGS_PATH, isDebug, paths } from './config.js';
 import { install, installedHookCliPath, statusInstalled, uninstall } from './hooks/install.js';
 import { SCHEMA_VERSION, schemaHash } from './schema.js';
-import { getPanelistId, isAuthStuck, peekPanelistId } from './panelist.js';
+import { getPanelistId, isAuthStuck, peekPanelistId, registrationTime } from './panelist.js';
+import { computePoints, isEarlyPanelist } from './points.js';
 import { clear, readEvents, readLines } from './queue.js';
 import { flush, requestServerPurge } from './send.js';
 import { ensureRegistered } from './register.js';
@@ -99,11 +100,18 @@ export function cmdStats(): void {
     }
   }
 
+  const early = isEarlyPanelist(registrationTime());
+  const points = computePoints(events.map((e) => String(e.type)), { early });
+
   console.log('royalties stats (local)');
   console.log(`  panelist id : ${peekPanelistId() ?? '(none yet)'}`);
   console.log(`  events      : ${events.length} total, ${readLines(paths.queue).length} pending send`);
   console.log(`  sessions    : ${sessions}`);
   console.log(`  tokens      : ${tokensIn} in / ${tokensOut} out`);
+  console.log(`  points      : ${points.total} contribution points (local estimate — server-side tally is authoritative once payouts open)`);
+  console.log(
+    `                ${points.early ? `base ${points.base} × ${points.multiplier} (early panelist)` : `base ${points.base}`} · scoring: POINTS.md`,
+  );
   console.log(`  by type     : ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(', ') || '(none)'}`);
   console.log(`  top packages: ${top(packages)}`);
   console.log(`  top domains : ${top(domains)}`);

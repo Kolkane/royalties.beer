@@ -62,6 +62,23 @@ Opt out any project by dropping a `.royaltiesignore` file in its root. Uninstall
 
 ---
 
+## How earnings work
+
+Your contribution is scored as **contribution points** — a share of the panel, not a currency (think beer money, not rent money):
+
+- Each collected event scores points: `dependency_added` 10, `api_domain_used` 8, `session` 2, `error` 1.
+- **Early panelists** (registered in the first 90 days) earn **×2** on all their points, forever.
+- **30–40%** of data revenue funds a payout pool; your cut is `(your points / total points) × pool`.
+- The first payout cycle triggers at **€1,000** cumulative data revenue.
+
+```bash
+npx royalties stats   # shows your running points total
+```
+
+That total is a **local estimate — the server-side tally is authoritative once payouts open.** The full scoring table and the commitments above are the public law in [`POINTS.md`](./POINTS.md): changeable only by public PR, never retroactive.
+
+---
+
 ## Why this exists
 
 In June 2026, [Kickbacks](https://kickbacks.ai) proved developers will monetize their terminal — by selling your *attention* to advertisers.

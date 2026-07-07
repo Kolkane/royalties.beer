@@ -66,6 +66,14 @@ export function peekPanelistId(): string | null {
   return readPanelist()?.panelist_id ?? null;
 }
 
+/** Best local proxy for when this panelist joined: the registration time if we
+ *  have a token, else the id's creation time. Used only for the early-panelist
+ *  points estimate (the server-side determination is authoritative). */
+export function registrationTime(): string | null {
+  const p = readPanelist();
+  return p?.registered_at ?? p?.created_at ?? null;
+}
+
 /** The panelist id + token, or null if not registered yet. */
 export function getAuth(): Auth | null {
   const p = readPanelist();

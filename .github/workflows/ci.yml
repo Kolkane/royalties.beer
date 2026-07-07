@@ -78,3 +78,33 @@ jobs:
             echo "::error::src/schema.ts or src/data/** changed but SCHEMA.md did not. The whitelist, its data lists, and the spec must change in the same changeset."
             exit 1
           fi
+
+  # The scoring table (src/points.ts) is public law like the whitelist: it must
+  # never change without POINTS.md changing in the same changeset. Same mechanism
+  # as schema-guard.
+  points-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fail if src/points.ts changed without POINTS.md
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+            head='${{ github.event.pull_request.head.sha }}'
+          else
+            base='${{ github.event.before }}'
+            head='${{ github.sha }}'
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "No previous commit to diff against (new branch); skipping."
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" "$head")"
+          echo "Changed files:"
+          echo "$changed"
+          if echo "$changed" | grep -qE '^src/points\.ts$' && ! echo "$changed" | grep -qx 'POINTS.md'; then
+            echo "::error::src/points.ts changed but POINTS.md did not. The scoring table and its public spec must change in the same changeset."
+            exit 1
+          fi
