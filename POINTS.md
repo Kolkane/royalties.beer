@@ -23,7 +23,7 @@ Points are awarded per **collected** event. Only whitelisted events ever leave y
 
 Panelists who **register within the first 90 days of the program** earn a **×2 multiplier on all their points, forever** — early data is scarcer and does the most to bootstrap the panel, so early contributors carry more weight.
 
-The window is anchored to the program launch date (`PROGRAM_LAUNCH` in `src/points.ts`, currently **2026-07-04**); registrations at or before launch + 90 days qualify. `royalties stats` estimates this from your local registration time; the server-side determination is authoritative.
+The window is anchored to the public launch date (`PROGRAM_LAUNCH` in `src/points.ts`, currently **2026-07-09**): any registration **at or before launch + 90 days** qualifies. There is **no lower bound** — panelists who joined before launch (our early testers) count as early too. `royalties stats` estimates this from your local registration time; the server-side determination is authoritative.
 
 ## How points become money
 

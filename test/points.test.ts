@@ -60,11 +60,16 @@ describe('early-panelist multiplier', () => {
 
   const launch = Date.parse(PROGRAM_LAUNCH_ISO);
   const day = 24 * 60 * 60 * 1000;
-  it('isEarlyPanelist: inside the window qualifies (cutoff inclusive), after does not', () => {
+  it('isEarlyPanelist: qualifies through launch + window (cutoff inclusive), not after', () => {
     expect(isEarlyPanelist(new Date(launch).toISOString())).toBe(true); // at launch
     expect(isEarlyPanelist(new Date(launch + (EARLY_WINDOW_DAYS - 1) * day).toISOString())).toBe(true);
     expect(isEarlyPanelist(new Date(launch + EARLY_WINDOW_DAYS * day).toISOString())).toBe(true); // cutoff
     expect(isEarlyPanelist(new Date(launch + (EARLY_WINDOW_DAYS + 1) * day).toISOString())).toBe(false);
+  });
+
+  it('isEarlyPanelist: no lower bound — registrations before launch (testers) qualify', () => {
+    expect(isEarlyPanelist(new Date(launch - day).toISOString())).toBe(true); // the day before launch
+    expect(isEarlyPanelist(new Date(launch - 120 * day).toISOString())).toBe(true); // well before launch
   });
 
   it('isEarlyPanelist: missing/garbage timestamp is not early', () => {

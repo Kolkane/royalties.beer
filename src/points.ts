@@ -25,10 +25,11 @@ export const POINTS_TABLE: Record<EventType, number> = {
  *  earn this multiplier on all their points, forever. Mirrors POINTS.md. */
 export const EARLY_PANELIST_MULTIPLIER = 2;
 
-/** Program launch anchor for the early-panelist window (the repo's inception).
- *  Registrations at or before PROGRAM_LAUNCH + EARLY_WINDOW_DAYS qualify.
- *  Mirrors POINTS.md; changeable only by public, forward-only PR. */
-export const PROGRAM_LAUNCH_ISO = '2026-07-04T00:00:00.000Z';
+/** Public-launch anchor for the early-panelist window. A registration qualifies
+ *  if it is AT OR BEFORE PROGRAM_LAUNCH + EARLY_WINDOW_DAYS — there is NO lower
+ *  bound, so panelists who registered before launch (our early testers) also
+ *  count as early. Mirrors POINTS.md; changeable only by public, forward-only PR. */
+export const PROGRAM_LAUNCH_ISO = '2026-07-09T00:00:00.000Z';
 export const EARLY_WINDOW_DAYS = 90;
 
 export interface PointsBreakdown {
@@ -40,8 +41,9 @@ export interface PointsBreakdown {
   byType: Record<string, number>; // base points per event type
 }
 
-/** Whether a registration timestamp falls inside the early-panelist window.
- *  A missing/unparseable timestamp is treated as NOT early (no unearned ×2). */
+/** Whether a registration qualifies for the early-panelist multiplier: any time
+ *  AT OR BEFORE launch + EARLY_WINDOW_DAYS. No lower bound — pre-launch testers
+ *  qualify. A missing/unparseable timestamp is treated as NOT early. */
 export function isEarlyPanelist(registeredAtIso: string | null | undefined): boolean {
   if (!registeredAtIso) return false;
   const reg = Date.parse(registeredAtIso);
