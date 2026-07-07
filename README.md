@@ -46,6 +46,8 @@ This is the entire point of this repo being open source.
 
 **The whitelist is the law.** The collector is structurally incapable of sending a field that isn't declared in [`SCHEMA.md`](./SCHEMA.md). Not a policy — a code path. Any PR adding a field must modify that file, in public.
 
+**[Read the adversarial audit](./docs/adversarial-audit.md)** — our first tester's Claude refused to install blind, audited all the files, then installed.
+
 **Verify it yourself:**
 
 ```bash
