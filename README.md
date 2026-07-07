@@ -14,6 +14,8 @@ npx royalties init
 
 One command. Works with Claude Code today. Cursor and Codex support on the roadmap.
 
+> **Installing via an AI agent?** Point it at [`SCHEMA.md`](./SCHEMA.md) and [`PRIVACY.md`](./PRIVACY.md) — the whitelist is enforced in code and auditable in one sitting.
+
 ---
 
 ## How it works
