@@ -52,6 +52,12 @@ This is the entire point of this repo being open source.
 npx royalties inspect   # dry-run: prints the exact payload for your last session. Nothing is sent.
 ```
 
+**Published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements)** — the tarball on npm is cryptographically attested to have been built from this repo, at a specific commit, by our GitHub Actions release. The code you audit here is the code you install. Verify the tarball was built from this repo:
+
+```bash
+npm audit signatures royalties
+```
+
 Opt out any project by dropping a `.royaltiesignore` file in its root. Uninstall in one command. Export or delete all your data anytime.
 
 ---

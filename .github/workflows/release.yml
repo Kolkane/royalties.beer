@@ -1,0 +1,54 @@
+# Publishes to npm with provenance when a version tag (v*) is pushed.
+#
+# npm provenance cryptographically attests that the published tarball was built
+# from THIS repo, at THIS commit, by THIS workflow — closing the "the GitHub repo
+# looks clean but is the npm tarball the same code?" gap. Verify a release with:
+#   npm audit signatures royalties
+#
+# Requirements (already standard, listed here so the setup is auditable):
+#   - permissions.id-token: write   -> the OIDC token npm uses to sign provenance
+#   - secrets.NPM_TOKEN             -> a granular automation token with publish
+#                                      rights (automation tokens bypass 2FA in CI)
+# Cutting a release:
+#   npm version patch   # bumps package.json + creates the vX.Y.Z tag
+#   git push --follow-tags
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance (OIDC)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org' # writes an auth-ready .npmrc for NODE_AUTH_TOKEN
+
+      # Guard: the tag must match package.json, so a mistyped tag can never
+      # publish a mismatched version.
+      - name: Verify tag matches package.json version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+
+      - run: npm install --no-audit --no-fund
+
+      # `prepublishOnly` (lint + typecheck + test + build) runs automatically here,
+      # so a release can never ship a tree that fails the suite or does not build.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
